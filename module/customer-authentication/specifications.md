@@ -90,7 +90,7 @@ Each document section contains:
 **JWT payload:** `{ customer_id, customer_code, customer_name, email, role: "customer", exp: 24h }`
 
 ### Session
-- Token disimpan di `httpOnly` cookie (preferred) atau `localStorage`.
+- Token disimpan di `localStorage` sebagai `customer_token`.
 - Semua protected route `/customer/*` memvalidasi JWT dan cek `role = customer`.
 
 ## 4. Database Schema
@@ -148,6 +148,9 @@ CREATE TABLE customer_documents (
 | Route | Component | Auth Guard |
 |-------|-----------|-----------|
 | /register | CustomerRegisterPage | Public |
-| /login | CustomerLoginPage | Public (redirect if logged in) |
+| /customer/login | CustomerLoginPage | Public (redirect to /customer/dashboard if logged in) |
 | /register/success | RegistrationSuccessPage | Public |
+| /customer/dashboard | CustomerDashboardPage | Customer JWT required |
 | /customer/* | (all customer pages) | Customer JWT required |
+
+> **Note:** JWT token stored in `localStorage` as `customer_token`. Admin routes are entirely separate under `/admin/*` (separate login at `/admin/login`, HTTP-only cookie auth).

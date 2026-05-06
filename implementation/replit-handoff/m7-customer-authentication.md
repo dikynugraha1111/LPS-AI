@@ -289,7 +289,7 @@ Body:
 File: `internal/middleware/customer_auth.go`
 
 Echo middleware that:
-1. Reads `Authorization: Bearer <token>` header (or cookie `lps_token`).
+1. Reads `Authorization: Bearer <token>` header.
 2. Validates JWT signature with `JWT_SECRET`.
 3. Checks `role = "customer"` in payload.
 4. Attaches `customer_id` and `customer_code` to Echo context.
@@ -306,7 +306,7 @@ File: `src/pages/customer/RegisterPage.tsx`
 Route: `/register` (public)
 
 Header:
-- "← Back to Login" link top-left → `/login`
+- "← Back to Login" link top-left → `/customer/login`
 - Ship icon + "Customer Registration" title + subtitle "Register your company to access the STS Platform"
 
 **Section 1 — Company Information** (Card with title "Company Information"):
@@ -337,7 +337,7 @@ Each document card contains:
 - `Issue Date` and `Expiry Date` side-by-side date inputs (dd/mm/yyyy format)
 
 Footer buttons (full-width row, right-aligned):
-- "Cancel" button (outline variant) → navigate to `/login`
+- "Cancel" button (outline variant) → navigate to `/customer/login`
 - "Submit Registration" button (primary, navy blue) → submit form
 
 On submit:
@@ -360,7 +360,7 @@ Content:
 - Success icon (green checkmark)
 - Title: "Registrasi Berhasil"
 - Message: "Akun Anda sedang menunggu validasi Admin. Kami akan menghubungi Anda melalui email setelah akun diaktifkan."
-- "Kembali ke Login" button → `/login`
+- "Kembali ke Login" button → `/customer/login`
 
 ---
 
@@ -368,12 +368,12 @@ Content:
 
 File: `src/pages/customer/LoginPage.tsx`
 
-Route: `/login` (redirect to `/customer/dashboard` if already logged in)
+Route: `/customer/login` (redirect to `/customer/dashboard` if already logged in)
 
 Form fields: Email, Password.
 Use TanStack React Query `useMutation`.
 
-On success: store JWT in `localStorage` as `lps_token`, navigate to `/customer/dashboard`.
+On success: store JWT in `localStorage` as `customer_token`, navigate to `/customer/dashboard`.
 On 401/403: display error message from API response.
 
 ---
@@ -383,9 +383,9 @@ On 401/403: display error message from API response.
 File: `src/components/CustomerAuthGuard.tsx`
 
 Wrap all `/customer/*` routes. On mount:
-1. Read token from `localStorage`.
+1. Read `customer_token` from `localStorage`.
 2. Decode JWT (check `role = "customer"` and expiry).
-3. Invalid/expired: clear token, redirect to `/login`.
+3. Invalid/expired: clear token, redirect to `/customer/login`.
 
 ---
 
@@ -395,7 +395,9 @@ File: `src/pages/admin/PendingCustomersPage.tsx`
 
 Route: `/admin/customers/pending` (Admin JWT required)
 
-Table columns: Customer Name, Type (badges), NPWP, PIC Name, Email, Phone, Registered At, Actions.
+Table columns: Customer Name, NPWP, PIC Name, Email, Phone, Registered At, Actions.
+
+> **Note:** Route is `/admin/customers/pending`. Admin must be authenticated via Admin JWT (HTTP-only cookie). Redirect to `/admin/login` if not authenticated.
 
 Actions per row:
 - "Detail & Dokumen" button → opens Dialog showing full customer info + document list with download links.

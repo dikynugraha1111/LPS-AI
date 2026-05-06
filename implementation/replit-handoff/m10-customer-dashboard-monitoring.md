@@ -394,7 +394,7 @@ Nav items (update from previous):
 - Nominasi → `/customer/nominations`
 - Document Master → `/customer/documents`
 - Cuaca & Alert → `/customer/weather`
-- Keluar (logout) → clear token, redirect `/login`
+- Keluar (logout) → clear `customer_token` from localStorage, redirect to `/customer/login`
 
 Wrap all `/customer/*` routes with `CustomerLayout` and `CustomerAuthGuard`.
 
@@ -422,4 +422,4 @@ Wrap all `/customer/*` routes with `CustomerLayout` and `CustomerAuthGuard`.
 - [ ] Customer can download/preview documents from Document Master
 - [ ] One customer cannot access another customer's documents
 - [ ] All pages are accessible via the customer sidebar navigation
-- [ ] Logout clears session and redirects to /login
+- [ ] Logout clears `customer_token` from localStorage and redirects to `/customer/login`

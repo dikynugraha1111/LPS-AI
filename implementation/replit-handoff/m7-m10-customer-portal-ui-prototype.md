@@ -270,7 +270,7 @@ export default function App() {
   return (
     <Switch>
       {/* Public */}
-      <Route path="/login" component={LoginPage} />
+      <Route path="/customer/login" component={LoginPage} />
       <Route path="/register" component={RegisterPage} />
       <Route path="/register/success" component={RegisterSuccessPage} />
 
@@ -286,7 +286,7 @@ export default function App() {
 
       {/* Default redirect */}
       <Route path="/">
-        <Redirect to="/login" />
+        <Redirect to="/customer/login" />
       </Route>
     </Switch>
   );
@@ -336,7 +336,7 @@ export function CustomerLayout({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="p-4 border-t">
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => { localStorage.removeItem('customer_token'); navigate('/customer/login'); }}
             className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm text-red-600 hover:bg-red-50">
             <LogOut className="w-4 h-4" />
             Keluar

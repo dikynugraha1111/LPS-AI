@@ -1,4 +1,25 @@
 
+## 2026-05-06T04:00:00+07:00
+- **Task Performed:** Sinkronisasi perubahan routing dari Replit ke semua layer dokumentasi.
+- **Files Modified:**
+  - `implementation/replit-handoff/m7-customer-authentication.md`
+  - `implementation/replit-handoff/m7-m10-customer-portal-ui-prototype.md`
+  - `implementation/replit-handoff/m10-customer-dashboard-monitoring.md`
+  - `module/customer-authentication/specifications.md`
+- **Logic / Decisions Made:**
+  - Customer login route: `/login` → `/customer/login` di semua file.
+  - Token key: `lps_token` → `customer_token` di localStorage (customer auth hanya pakai localStorage, bukan cookie).
+  - Admin auth: endpoint `POST /api/auth/login`, token disimpan di HTTP-only cookie, route login admin `/admin/login` — sepenuhnya terpisah dari customer auth.
+  - Admin protected routes semua di bawah prefix `/admin/` (e.g., `/admin/customers/pending`).
+  - JWT middleware customer: hanya baca `Authorization: Bearer` header (hapus referensi ke cookie `lps_token`).
+  - Logout handler: `localStorage.removeItem('customer_token')` + redirect ke `/customer/login`.
+  - Default root redirect: `/` → `/customer/login` (bukan `/login`).
+  - PendingCustomersPage: tambah note route `/admin/customers/pending` + redirect ke `/admin/login` jika tidak authenticated.
+  - m9: tidak ada referensi `/login` — tidak perlu diubah.
+- **Results / Next Steps:**
+  - Semua layer (replit-handoff + module specs) sudah konsisten dengan route structure aktual di Replit.
+  - M7–M10 siap dihandoff ulang ke Replit jika diperlukan update.
+
 ## 2026-05-06T03:00:00+07:00
 - **Task Performed:** Hapus field Tipe Pelanggan dari form registrasi customer; sistem default ke "Cargo Owner".
 - **Files Modified:**
