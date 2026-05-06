@@ -1,4 +1,21 @@
 
+## 2026-05-06T12:00:00+07:00
+- **Task Performed:** Update Swimlane Analysis LPS V3 berdasarkan screenshot Swimlane terbaru dari tim.
+- **Files Modified:**
+  - `document/Swimlane-Analysis-LPS V3.md`
+- **Logic / Decisions Made:**
+  - **EPB & Invoice DIPERTAHANKAN** (koreksi dari analisis sebelumnya yang merekomendasikan hapus): Screenshot mengkonfirmasi proses ini tetap ada di Customer Portal LPS dengan 4 status payment — Unpaid (Click Pay → Upload → Submit), Pending Review, Payment Reject (Click Revision Data → Re-upload), Paid.
+  - **EPB Confirmation flow disederhanakan**: Flow terbaru hanya 2 branch — True (Approved: view EPB detail → Upload Proof of Payment → Submit → data pindah ke EPB & Invoice menu) dan False (Update Nomination Data (REVISION) → Submit Nomination Update). Branch "Need Revision" terpisah dihapus, disatukan dalam branch False.
+  - **Extra Features baru ditambahkan** (bagian bawah screenshot berlabel "Extra Feature"):
+    1. **Customer Approval** (Admin): Login → Customer Management → View Detail Customer Registration → Approve/Reject → Send notif to customer
+    2. **Add Customer By Admin**: Login → Customer Management → Add new customer → Fill Customer data → (Optional: add custom document) → Save
+  - Extra Features ini sudah terimplementasi di M7 v1.1 (replit-handoff), sehingga swimlane kini sinkron dengan dokumentasi implementasi.
+  - Section Rekomendasi diupdate: tabel prioritas direvisi, item "Hapus EPB & Invoice" diganti dengan "Pertahankan EPB & Invoice dengan 4 status", tambah status "✅ Sudah di M7 v1.1" untuk Customer Approval.
+- **Results / Next Steps:**
+  - Swimlane Analysis V3 kini sinkron dengan screenshot terbaru dari tim.
+  - Perlu dipertimbangkan apakah M9 (Nomination Status & Payment) scope-nya perlu diupdate untuk mencerminkan: (1) EPB Confirmation flow 2-branch sederhana, (2) data payment masuk ke EPB & Invoice menu (Proses 6).
+  - EPB & Invoice sebagai menu terpisah mungkin perlu modul atau sub-modul tersendiri, atau digabung ke M9.
+
 ## 2026-05-06T11:00:00+07:00
 - **Task Performed:** Update replit-handoff M7 ke v1.1 (versioning) dan buat file delta baru untuk perubahan Admin Customer Management & Add Customer.
 - **Files Modified:**

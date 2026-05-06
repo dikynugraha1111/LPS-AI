@@ -4,6 +4,9 @@
 1. Analisis swimlane existing (V2) terhadap perubahan modul
 2. Temuan dan rekomendasi perbaikan
 3. Revised swimlane flow (V3)
+4. Extra Features (Admin Customer Management)
+
+> **Catatan Update 2026-05-06:** Dokumen ini diupdate berdasarkan screenshot Swimlane terbaru yang diterima dari tim. Perubahan utama: (1) EPB & Invoice **dipertahankan** di Customer side dengan 4 status payment; (2) Extra Feature baru ditambahkan — Customer Approval dan Add Customer By Admin.
 
 ---
 
@@ -31,25 +34,29 @@ Swimlane Customer V2 terdiri dari 6 proses utama:
 | 3 | **EPB Confirmation** | ⚠️ MODIFIKASI SIGNIFIKAN | Di V3, EPB di-generate oleh **STS Platform**, bukan LPS. Customer melihat EPB di LPS Portal. **Upload Proof of Payment tetap di LPS Portal** — customer mengupload bukti bayar sesuai EPB, lalu data dikirim ke STS untuk verifikasi. Namun langkah "Waiting Finance Approval" dan "Is Approved?" (Finance) **TIDAK LAGI di LPS** — verifikasi pembayaran dilakukan oleh STS Platform. | Revisi flow: Customer melihat EPB (dari STS) → Upload bukti bayar di LPS → Data dikirim ke STS → Status "Waiting Payment Verification" → STS konfirmasi → Voyage Start. Hapus role Finance dari flow LPS. |
 | 4 | **Track Voyage** | ✅ PERTAHANKAN | Monitoring voyage bersifat view-only dan data posisi kapal dari AIS. Sesuai dengan scope LPS sebagai monitoring platform. | Tidak ada perubahan substansial. Tambah catatan: data voyage status berasal dari STS Platform. |
 | 5 | **Weather Condition dan Alert Monitoring** | ✅ PERTAHANKAN | Sepenuhnya domain LPS. Weather monitoring dan alert system tetap di LPS. | Tidak ada perubahan. |
-| 6 | **EPB & Invoice** | ❌ HAPUS | Billing dan Invoice sudah dipindahkan ke STS Platform. Customer tidak lagi melihat EPB & Invoice melalui LPS Portal. | Hapus proses ini dari swimlane LPS Customer. Ganti dengan proses "Nomination & Voyage Status" yang merangkum monitoring nominasi dan voyage secara view-only. |
+| 6 | **EPB & Invoice** | ⚠️ REVISI — TETAP DI LPS | Screenshot terbaru mengkonfirmasi bahwa EPB & Invoice **tetap ada** di Customer Portal LPS, dengan 4 status payment: Unpaid, Pending Review, Payment Reject, dan Paid. Customer dapat mengakses detail EPB & Invoice, lalu melakukan pembayaran langsung dari portal LPS. | **Batalkan rekomendasi hapus sebelumnya.** Proses ini dipertahankan dengan flow: Login → EPB & Invoice → Click Detail → See detail EPB and Invoice → status-based payment action. |
 
 ### 1.3 Masalah Kritis yang Ditemukan
 
-**1. EPB Confirmation Flow perlu direvisi (sebagian tetap, sebagian pindah ke STS)**
+**1. EPB Confirmation Flow — Dipertahankan dengan Flow Sederhana**
 
-Di swimlane V2, EPB Confirmation melibatkan:
-- "Upload Proof of Payment" → **TETAP di LPS Portal** — customer mengupload bukti bayar melalui LPS, data dikirim ke STS via API
-- "Waiting Finance Approval" → **DIUBAH** menjadi "Waiting Payment Verification" — verifikasi dilakukan oleh STS Platform, bukan Finance LPS
-- "Is Approved?" (Finance) → **DIHAPUS** — keputusan verifikasi pembayaran ada di STS Platform. LPS hanya menerima hasil (Confirmed/Rejected)
+Berdasarkan screenshot terbaru, EPB Confirmation flow adalah:
+- `Login → Nomination Status → Is Approved?`
+  - **(True):** `See EPB (Can see the detail data - schedule, dll) → Upload Proof of Payment and fill the data → Submit`
+  - **(False):** `Update Nomination Data (REVISION) → Submit Nomination Update`
+- Tidak ada branch "Need Revision" terpisah — flow REVISION tetap dalam satu decision node "Is Approved?"
 
-**Dampak:** Flow upload bukti bayar tetap ada di LPS, namun proses verifikasi dan approval keuangan dipindahkan ke STS. Role Finance dihapus dari LPS.
+**2. EPB & Invoice — DIPERTAHANKAN di LPS Customer Portal**
 
-**2. EPB & Invoice sebagai proses terpisah tidak relevan**
+Screenshot terbaru mengkonfirmasi bahwa EPB & Invoice **tetap ada** di Customer Portal LPS dengan flow:
+- `Login → EPB & Invoice → Click Detail → See the detail EPB and Invoice`
+- Status payment bercabang menjadi 4:
+  - **Unpaid:** `Click Pay → Upload Payment Proof and fill the data → Submit Data`
+  - **Pending Review:** (view-only, menunggu verifikasi)
+  - **Payment Reject:** `Click Revision Data → Upload Payment Proof and fill the data → Upload Payment Proof and fill the data`
+  - **Paid:** (view-only, selesai)
 
-Di V3, customer mengakses EPB dan Invoice melalui STS Platform, bukan LPS. Mempertahankan proses ini di LPS akan menyebabkan:
-- Duplikasi data antara LPS dan STS
-- Kebingungan customer tentang di mana melihat invoice
-- Tanggung jawab ganda (LPS dan STS sama-sama menampilkan billing data)
+> **Koreksi dari analisis sebelumnya:** Analisis V3 sebelumnya merekomendasikan menghapus proses ini. Berdasarkan screenshot baru yang diterima, rekomendasi ini **dibatalkan**. EPB & Invoice tetap menjadi bagian dari Customer Portal LPS.
 
 ---
 
@@ -130,59 +137,34 @@ Di V3, customer mengakses EPB dan Invoice melalui STS Platform, bukan LPS. Mempe
 │              └──────────────────────────────────────────────────────────┘                │
 │                                                                                          │
 │ ═══════════════════════════════════════════════════════════════════════════════════════    │
-│ PROSES 3: NOMINATION STATUS, EPB & PAYMENT (V3 - REVISED)                               │
+│ PROSES 3: EPB CONFIRMATION (V3 — DIREVISI sesuai screenshot terbaru)                    │
 │ ═══════════════════════════════════════════════════════════════════════════════════════    │
 │                                                                                          │
-│   [Login] → [Nomination Status] → <Is Approved? (from STS Platform)>                    │
+│   [Login] → [Nomination Status] → <Is Approved?>                                        │
 │                                           │                                              │
-│                    ┌──────────────────────┼──────────────────────┐                       │
-│                    │                      │                      │                        │
-│                   True                   False              Need Revision                 │
-│                    ↓                      ↓                      ↓                        │
-│             [View Details:         [View Status:          [Update Nomination              │
-│              - Schedule            "Menunggu proses        Data (REVISION)]               │
-│              - Anchor Point         di STS Platform"]          ↓                          │
-│              - ETB                                       [Re-Submit ke                    │
-│              - EPB (view-only,                            STS Platform]                   │
-│                from STS)]                                                                │
+│                    ┌──────────────────────┴──────────────────────┐                       │
+│                   True                                          False                    │
+│                    ↓                                              ↓                      │
+│   [See EPB (Can see the detail data:             [Update Nomination Data                 │
+│    schedule, dock, dll)]                          (REVISION)]                           │
+│                    │                                              ↓                      │
+│                    ↓                              [Submit Nomination Update]             │
+│   [Upload Proof of Payment                                                               │
+│    and fill the data]                                                                    │
 │                    │                                                                     │
 │                    ↓                                                                     │
-│             [View EPB Detail &                                                           │
-│              Nominal yang harus                                                          │
-│              dibayarkan]                                                                 │
+│             [Submit]                                                                     │
 │                    │                                                                     │
 │                    ↓                                                                     │
-│             [Upload Proof of Payment                                                     │
-│              (PDF/JPG/PNG, max 5MB)]                                                     │
-│                    │                                                                     │
-│                    ↓                                                                     │
-│             [Data bukti bayar dikirim                                                    │
-│              ke STS Platform via API]                                                    │
-│                    │                                                                     │
-│                    ↓                                                                     │
-│             [Status: "Waiting Payment                                                    │
-│              Verification"]                                                              │
-│                    │                                                                     │
-│                    ↓                                                                     │
-│             <Payment Verified?                                                           │
-│              (from STS Platform)>                                                        │
-│                    │                      │                                               │
-│                 Confirmed              Rejected                                          │
-│                    ↓                      ↓                                               │
-│             [Status: "Payment      [Notifikasi alasan                                    │
-│              Confirmed"]            penolakan →                                          │
-│                    │                Re-upload bukti bayar]                                │
-│                    ↓                                                                     │
-│             [Voyage Start]                                                               │
+│   [The data will be moved to                                                             │
+│    EPB and Invoice Menu]                                                                 │
 │                                                                                          │
-│   * PERUBAHAN V3:                                                                        │
-│     - DIPERTAHANKAN: Upload Proof of Payment (tetap di LPS Portal)                      │
-│     - DIHAPUS: Waiting Finance Approval (diganti Waiting Payment Verification dari STS) │
-│     - DIHAPUS: Finance approval decision (role Finance dihapus dari LPS)                │
-│     - DITAMBAH: Data bukti bayar dikirim ke STS Platform via API                        │
-│     - DITAMBAH: Menerima hasil verifikasi pembayaran dari STS (Confirmed/Rejected)      │
-│     - EPB ditampilkan sebagai view-only (sumber data: STS Platform)                     │
-│     - Verifikasi pembayaran dilakukan oleh STS Platform, bukan LPS                      │
+│   * PERUBAHAN V3 (berdasarkan screenshot terbaru):                                       │
+│     - Flow lebih sederhana: hanya 2 branch (True / False), tidak ada "Need Revision"    │
+│       sebagai branch terpisah — revisi dilakukan via "False" branch                     │
+│     - Setelah Upload Proof of Payment → Submit → data PINDAH ke menu EPB & Invoice      │
+│     - Menu EPB & Invoice menangani siklus verifikasi payment (lihat Proses 6)           │
+│     - EPB dapat dilihat detailnya: schedule, dock, dll (view-only dari STS Platform)    │
 │                                                                                          │
 │ ═══════════════════════════════════════════════════════════════════════════════════════    │
 │ PROSES 4: TRACK VOYAGE                                                                   │
@@ -208,12 +190,33 @@ Di V3, customer mengakses EPB dan Invoice melalui STS Platform, bukan LPS. Mempe
 │   * Tidak ada perubahan dari V2                                                          │
 │                                                                                          │
 │ ═══════════════════════════════════════════════════════════════════════════════════════    │
-│ PROSES 6: EPB & INVOICE ← ❌ DIHAPUS DI V3                                              │
+│ PROSES 6: EPB & INVOICE (V3 — DIPERTAHANKAN, DIREVISI)                                  │
 │ ═══════════════════════════════════════════════════════════════════════════════════════    │
 │                                                                                          │
-│   * SELURUH PROSES DIHAPUS dari swimlane LPS Customer                                   │
-│   * Alasan: Billing, Invoice, dan EPB management dikelola oleh STS Platform             │
-│   * Customer mengakses EPB & Invoice melalui STS Platform / Customer Portal STS         │
+│   [Login] → [EPB & Invoice] → [Click Detail] → [See the detail EPB and Invoice]         │
+│                                                          │                               │
+│                                   ┌──────────────────────┼──────────────────────┐        │
+│                                   │                      │                      │        │
+│                                [Unpaid]          [Pending Review]         [Payment       │
+│                                   │              (view-only, waiting       Reject]       │
+│                              [Click Pay]          verification)               │          │
+│                                   │                                    [Click Revision   │
+│                    [Upload Payment Proof                                  Data]          │
+│                     and fill the data]                                        │          │
+│                                   │                              [Upload Payment Proof   │
+│                             [Submit Data]                         and fill the data]     │
+│                                                                        │                 │
+│                                                              [Upload Payment Proof       │
+│                                                               and fill the data]         │
+│                                                                                          │
+│                                [Paid]                                                    │
+│                             (view-only)                                                  │
+│                                                                                          │
+│   * PERUBAHAN dari analisis sebelumnya:                                                  │
+│     - Proses ini DIPERTAHANKAN (tidak dihapus) berdasarkan screenshot terbaru           │
+│     - 4 status payment: Unpaid, Pending Review, Payment Reject, Paid                    │
+│     - Flow Unpaid: Click Pay → Upload Payment Proof → Submit Data                       │
+│     - Flow Payment Reject: Click Revision Data → Re-upload Payment Proof               │
 │                                                                                          │
 └─────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -314,10 +317,10 @@ Di V3, customer mengakses EPB dan Invoice melalui STS Platform, bukan LPS. Mempe
 |--------|----|----|----------------|
 | Registration | ✅ Sama | ✅ Sama | Tidak berubah |
 | Nomination Request | Submit → Internal LPS | Submit → Dikirim ke STS Platform via API | **MODIFIKASI** — tambah langkah integrasi STS |
-| EPB Confirmation | Upload bukti bayar → Finance approval → Voyage Start | View EPB (from STS) → Upload bukti bayar di LPS → Dikirim ke STS → Waiting Payment Verification → Payment Confirmed → Voyage Start | **MODIFIKASI SIGNIFIKAN** — upload bukti bayar tetap di LPS, verifikasi pindah ke STS, role Finance dihapus |
+| EPB Confirmation | Upload bukti bayar → Finance approval → Voyage Start | Is Approved? → (True) View EPB detail → Upload Payment Proof → Submit → data pindah ke EPB & Invoice menu; (False) Update Nomination Data (REVISION) → Submit Nomination Update | **MODIFIKASI** — flow disederhanakan: 2 branch (True/False), data payment masuk ke menu EPB & Invoice |
 | Track Voyage | ✅ Sama | ✅ Sama (data voyage dari STS) | Tidak berubah substansial |
 | Weather & Alert | ✅ Sama | ✅ Sama | Tidak berubah |
-| EPB & Invoice | Lihat detail EPB dan Invoice | **DIHAPUS** | **HAPUS** — pindah ke STS Platform |
+| EPB & Invoice | Login → Click Detail → Lihat detail EPB dan Invoice | **DIPERTAHANKAN + DIPERLUAS** — 4 status: Unpaid (Click Pay → Upload → Submit), Pending Review, Payment Reject (Revision → Re-upload), Paid | **KOREKSI dari analisis sebelumnya** — proses ini TIDAK dihapus |
 
 ### 4.2 Operator Swimlane — Perubahan
 
@@ -357,23 +360,30 @@ flowchart TD
         B6 --> B10
     end
 
-    subgraph NOMINATION_STATUS_PAYMENT["NOMINATION STATUS, EPB & PAYMENT (REVISED V3)"]
-        C1[Login] --> C2[Nomination Status Page]
-        C2 --> C3{Status from STS Platform?}
-        C3 -->|Approved| C4[View Details:<br/>Schedule, Anchor Point,<br/>ETB, EPB view-only]
-        C3 -->|Need Revision| C5[Update Nomination Data]
-        C3 -->|Pending| C6[View Status: Waiting STS Processing]
-        C5 --> C7[Re-Submit to STS Platform]
-        C7 --> C2
-        C4 --> C4a[View EPB Detail &<br/>Nominal to Pay]
-        C4a --> C4b[Upload Proof of Payment<br/>PDF/JPG/PNG max 5MB]
-        C4b --> C4c[Data sent to STS<br/>Platform via API]
-        C4c --> C4d[Status: Waiting<br/>Payment Verification]
-        C4d --> C4e{Payment Verified?<br/>from STS Platform}
-        C4e -->|Confirmed| C8[Status: Payment Confirmed]
-        C4e -->|Rejected| C4f[Notification with<br/>rejection reason]
-        C4f --> C4b
-        C8 --> C9[Voyage Start]
+    subgraph EPB_CONFIRMATION["EPB CONFIRMATION (REVISED V3)"]
+        C1[Login] --> C2[Nomination Status]
+        C2 --> C3{Is Approved?}
+        C3 -->|True| C4[See EPB<br/>Can see detail data:<br/>schedule, dock, dll]
+        C3 -->|False| C5[Update Nomination Data<br/>REVISION]
+        C5 --> C6[Submit Nomination Update]
+        C4 --> C7[Upload Proof of Payment<br/>and fill the data]
+        C7 --> C8[Submit]
+        C8 --> C9[Data moved to<br/>EPB & Invoice Menu]
+    end
+
+    subgraph EPB_INVOICE["EPB & INVOICE (DIPERTAHANKAN V3)"]
+        F1[Login] --> F2[EPB & Invoice]
+        F2 --> F3[Click Detail]
+        F3 --> F4[See the detail EPB and Invoice]
+        F4 --> F5{Payment Status}
+        F5 -->|Unpaid| F6[Click Pay]
+        F6 --> F7[Upload Payment Proof<br/>and fill the data]
+        F7 --> F8[Submit Data]
+        F5 -->|Pending Review| F9[View-only<br/>Waiting Verification]
+        F5 -->|Payment Reject| F10[Click Revision Data]
+        F10 --> F11[Upload Payment Proof<br/>and fill the data]
+        F11 --> F12[Upload Payment Proof<br/>and fill the data]
+        F5 -->|Paid| F13[View-only<br/>Completed]
     end
 
     subgraph TRACK_VOYAGE
@@ -390,11 +400,12 @@ flowchart TD
         E5 --> E6[View Alert History<br/>& Ongoing Alerts Real-time]
     end
 
-    style NOMINATION_STATUS_PAYMENT fill:#e8f5e9,stroke:#4caf50
+    style EPB_CONFIRMATION fill:#e8f5e9,stroke:#4caf50
+    style EPB_INVOICE fill:#e3f2fd,stroke:#2196f3
     style B9 fill:#fff3e0,stroke:#ff9800
-    style C4b fill:#e3f2fd,stroke:#2196f3
-    style C4c fill:#fff3e0,stroke:#ff9800
-    style C4d fill:#fce4ec,stroke:#e91e63
+    style C9 fill:#fff3e0,stroke:#ff9800
+    style F8 fill:#e8f5e9,stroke:#4caf50
+    style F13 fill:#e8f5e9,stroke:#4caf50
 ```
 
 ### 4.4 Diagram Mermaid — Operator Flow V3
@@ -453,18 +464,125 @@ flowchart TD
 
 ---
 
-## 5. REKOMENDASI IMPLEMENTASI
+## 5. EXTRA FEATURES — ADMIN CUSTOMER MANAGEMENT
 
-### 5.1 Prioritas Perubahan
+> Fitur-fitur ini muncul di bagian bawah screenshot Swimlane terbaru dengan label **"Extra Feature"**. Keduanya merupakan fitur Admin (Operator TBK side), bukan Customer side.
 
-| Prioritas | Item | Effort |
-|-----------|------|--------|
-| 🔴 High | Hapus proses EPB & Invoice dari Customer swimlane | Low |
-| 🔴 High | Revisi EPB Confirmation: hapus payment flow, jadikan view-only | Medium |
-| 🟡 Medium | Tambah integrasi STS API di Nomination Request flow | Medium |
-| 🟢 Low | Update label/keterangan di Track Voyage (sumber data dari STS) | Low |
+### 5.1 Customer Approval
 
-### 5.2 Dampak ke UI/UX Mockup
+**Actor:** Admin / Operator TBK  
+**Trigger:** Ada customer baru yang mendaftar mandiri (self-registration) dan menunggu validasi
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ EXTRA FEATURE: CUSTOMER APPROVAL                                                         │
+│ Actor: Admin (Operator TBK)                                                              │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│   [Login] → [Customer Management] → [View Detail Customer Registration Data]            │
+│                                                  │                                       │
+│                                  ┌───────────────┴───────────────┐                      │
+│                                  │                               │                      │
+│                       [Approve User Registration]   [Reject User Registration]           │
+│                                  │                               │                      │
+│                                  └───────────────┬───────────────┘                      │
+│                                                  │                                       │
+│                                    [Send notif to customer]                              │
+│                                    (email notification:                                  │
+│                                     approved / rejected)                                 │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Flow singkat:**
+`Login → Customer Management → View Detail Customer Registration Data → Approve/Reject User Registration → Send notif to customer`
+
+**Catatan:**
+- Approve: Customer status berubah menjadi ACTIVE, Customer Code di-generate, notifikasi approval dikirim via email
+- Reject: Customer status berubah menjadi REJECTED, notifikasi penolakan dikirim via email
+- Sudah terimplementasi di M7 v1.1 (replit-handoff `m7-customer-authentication.md` dan `m7-customer-authentication-v1.1-delta.md`)
+
+---
+
+### 5.2 Add Customer By Admin
+
+**Actor:** Admin / Operator TBK  
+**Trigger:** Admin ingin menambahkan customer secara manual (tanpa self-registration)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ EXTRA FEATURE: ADD CUSTOMER BY ADMIN                                                     │
+│ Actor: Admin (Operator TBK)                                                              │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                          │
+│   [Login] → [Customer Management] → [Add new customer] → [Fill Customer data]           │
+│                                                                    │                     │
+│                                           (Optional) [Add custom document]               │
+│                                                                    │                     │
+│                                                              [Save]                      │
+│                                                                                          │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Flow singkat:**
+`Login → Customer Management → Add new customer → Fill Customer data → (Optional: add custom document) → Save`
+
+**Catatan:**
+- Customer yang ditambahkan Admin langsung ACTIVE (tidak perlu approval)
+- Customer Code di-generate otomatis saat Save
+- `registration_source = 'ADMIN'` (berbeda dari self-registration yang `= 'SELF'`)
+- Custom document: Admin dapat menambahkan dokumen non-standar dengan nama bebas (`doc_label`, `is_custom = true`)
+- Sudah terimplementasi di M7 v1.1 (replit-handoff `m7-customer-authentication.md` dan `m7-customer-authentication-v1.1-delta.md`)
+
+---
+
+### 5.3 Diagram Mermaid — Extra Features (Admin)
+
+```mermaid
+flowchart TD
+    subgraph CUSTOMER_APPROVAL["CUSTOMER APPROVAL (Extra Feature)"]
+        A1[Login] --> A2[Customer Management]
+        A2 --> A3[View Detail Customer<br/>Registration Data]
+        A3 --> A4{Approve or Reject?}
+        A4 -->|Approve| A5[Approve User Registration<br/>Status → ACTIVE<br/>Generate Customer Code]
+        A4 -->|Reject| A6[Reject User Registration<br/>Status → REJECTED]
+        A5 --> A7[Send notif to customer<br/>Email: Approved]
+        A6 --> A7b[Send notif to customer<br/>Email: Rejected]
+    end
+
+    subgraph ADD_CUSTOMER_ADMIN["ADD CUSTOMER BY ADMIN (Extra Feature)"]
+        B1[Login] --> B2[Customer Management]
+        B2 --> B3[Add new customer]
+        B3 --> B4[Fill Customer data<br/>Name, Email, Phone,<br/>PIC, Address, etc.]
+        B4 --> B5{Add custom document?}
+        B5 -->|Yes - Optional| B6[Add custom document<br/>doc_label, file upload]
+        B5 -->|No| B7[Save]
+        B6 --> B7
+        B7 --> B8[Customer Created ACTIVE<br/>Customer Code generated<br/>registration_source = ADMIN]
+    end
+
+    style CUSTOMER_APPROVAL fill:#fff3e0,stroke:#ff9800
+    style ADD_CUSTOMER_ADMIN fill:#f3e5f5,stroke:#9c27b0
+    style A5 fill:#e8f5e9,stroke:#4caf50
+    style A6 fill:#ffebee,stroke:#f44336
+    style B8 fill:#e8f5e9,stroke:#4caf50
+```
+
+---
+
+## 6. REKOMENDASI IMPLEMENTASI
+
+### 6.1 Prioritas Perubahan
+
+| Prioritas | Item | Effort | Status |
+|-----------|------|--------|--------|
+| 🔴 High | Revisi EPB Confirmation: 2 branch (Approved/Not Approved), data payment masuk ke EPB & Invoice menu | Medium | Perlu update di M9 |
+| 🔴 High | Pertahankan EPB & Invoice di Customer Portal dengan 4 status payment | Medium | Perlu review scope M9 |
+| 🟡 Medium | Tambah integrasi STS API di Nomination Request flow | Medium | Sudah di M8 handoff |
+| 🟡 Medium | Customer Approval & Add Customer By Admin | Medium | ✅ Sudah di M7 v1.1 |
+| 🟢 Low | Update label/keterangan di Track Voyage (sumber data dari STS) | Low | Sudah di M10 handoff |
+
+### 6.2 Dampak ke UI/UX Mockup
 
 Berdasarkan mockup yang ada di BRD LPS V2 (halaman 17-36), berikut dampak ke desain:
 
