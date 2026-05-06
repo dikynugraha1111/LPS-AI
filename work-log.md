@@ -1,4 +1,24 @@
 
+## 2026-05-06T03:00:00+07:00
+- **Task Performed:** Hapus field Tipe Pelanggan dari form registrasi customer; sistem default ke "Cargo Owner".
+- **Files Modified:**
+  - `document/BRD-LPS-V3-Analysis.md`
+  - `module/customer-authentication/requirements.md`
+  - `module/customer-authentication/specifications.md`
+  - `module/customer-authentication/user-stories.md`
+  - `implementation/design/2026-04-25-module7-decomposition-design.md`
+  - `implementation/replit-handoff/m7-customer-authentication.md`
+  - `implementation/replit-handoff/m7-m10-customer-portal-ui-prototype.md`
+  - `implementation/replit-handoff/m8-nomination-submission.md`
+- **Logic / Decisions Made:**
+  - Field `type` diubah dari `TEXT[]` (multi-select) menjadi `VARCHAR(50) DEFAULT 'Cargo Owner'` di semua DB schema.
+  - Go model diubah dari `pq.StringArray` menjadi `string` (tidak perlu import lib/pq).
+  - Form registrasi: checkbox Type dihapus; handler tidak menerima `type[]` dari request — selalu hardcode `type = "Cargo Owner"` saat insert.
+  - STS sync payload: `"type"` berubah dari array ke string `"Cargo Owner"`.
+  - mockCustomer di prototype diupdate dari array ke string.
+- **Results / Next Steps:**
+  - Semua layer sudah konsisten — field Type tidak muncul di form manapun.
+
 ## 2026-05-06T02:00:00+07:00
 - **Task Performed:** Sinkronisasi fitur Document Master ke semua layer dokumentasi. Fitur ini sebelumnya sudah diprompt ke Replit namun belum tersinkron ke repo ini.
 - **Files Modified:**

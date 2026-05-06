@@ -6,9 +6,9 @@
 **So that** I can submit vessel nominations.
 
 **Acceptance Criteria:**
-- [ ] Registration page menampilkan section "Company Information" dengan field: Customer Name, Type (checkboxes), NPWP, PIC Name, Phone Number, Email, Address, Note
+- [ ] Registration page menampilkan section "Company Information" dengan field: Customer Name, NPWP, PIC Name, Phone Number, Email, Address, Note
 - [ ] Field Customer Code ditampilkan sebagai read-only dengan label "Auto-generated on approval"
-- [ ] Type menggunakan multi-select checkbox: Cargo Owner, Shipper, PBM, Agen, Surveyor, Vendor Dozer; minimal 1 harus dipilih
+- [ ] Field Tipe Pelanggan tidak ditampilkan di form; sistem otomatis menetapkan "Cargo Owner" saat akun dibuat
 - [ ] Registration page menampilkan section "Required Documents" dengan 3 dokumen wajib: NPWP, NIP, Company Profile
 - [ ] Setiap dokumen memiliki sub-field: File (required), Description (optional), Issue Date (optional), Expiry Date (optional)
 - [ ] Tombol submit berlabel "Submit Registration"; tombol batal berlabel "Cancel"

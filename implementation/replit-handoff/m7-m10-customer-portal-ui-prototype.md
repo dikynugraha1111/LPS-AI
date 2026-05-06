@@ -249,7 +249,7 @@ export const mockAISPosition = {
 export const mockCustomer = {
   customerCode: 'CUST-202604-00007',
   customerName: 'PT Nusantara Bulk Shipping',
-  type: ['Cargo Owner', 'Shipper'],
+  type: 'Cargo Owner', // always defaulted by system
   picName: 'Budi Santoso',
   email: 'budi.santoso@nusantarabulk.co.id',
   phone: '+6281234567890',
@@ -378,7 +378,6 @@ Header:
 **Section 1 — Company Information** (Card):
 - Customer Code: Input disabled, placeholder "Auto-generated on approval", helper text "Auto-generated on approval"
 - Customer Name *: Input, placeholder "Enter company name"
-- Type *: 6 Checkboxes inline — Cargo Owner, Shipper, PBM, Agen, Surveyor, Vendor Dozer (mock: pre-check Cargo Owner and Shipper)
 - NPWP *: Input, placeholder "XX.XXX.XXX.X-XXX.XXX"
 - PIC Name *: Input, placeholder "Enter PIC name"
 - Phone Number *: Input, placeholder "Enter phone number"
@@ -386,7 +385,9 @@ Header:
 - Address: Textarea, placeholder "Enter company address"
 - Note: Textarea, placeholder "Additional notes (optional)"
 
-Layout: Customer Code + Customer Name (2-col). Type (full-width). NPWP + PIC Name (2-col). Phone Number + Email (2-col). Address (full-width). Note (full-width).
+Layout: Customer Code + Customer Name (2-col). NPWP + PIC Name (2-col). Phone Number + Email (2-col). Address (full-width). Note (full-width).
+
+> Tipe Pelanggan tidak ditampilkan — sistem default ke "Cargo Owner".
 
 **Section 2 — Required Documents** (Card, title "Required Documents", subtitle "All documents below are required for registration"):
 

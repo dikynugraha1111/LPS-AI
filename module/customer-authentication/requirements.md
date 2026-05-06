@@ -4,12 +4,11 @@ Derived from BRD Section 3.4.7 and Section 2.1 Module 7.
 
 | FR ID | Requirement | Actor | Priority |
 |-------|-------------|-------|----------|
-| FR-CA-01 | Sistem harus menyediakan halaman registrasi bagi customer baru dengan field: Customer Name, Type (multi-select), NPWP, PIC Name, Phone Number, Email, Address, Note, dan upload dokumen wajib (NPWP, NIP, Company Profile) | Customer | Must Have |
-| FR-CA-02 | Customer Code harus di-generate otomatis oleh sistem setelah Admin menyetujui registrasi | System | Must Have |
-| FR-CA-03 | Customer harus dapat memilih satu atau lebih tipe perusahaan: Cargo Owner, Shipper, PBM, Agen, Surveyor, Vendor Dozer | Customer | Must Have |
-| FR-CA-04 | Customer wajib mengupload 3 dokumen saat registrasi: NPWP (file), NIP (file), Company Profile (file), dengan field tambahan Issue Date dan Expiry Date per dokumen | Customer | Must Have |
-| FR-CA-05 | Admin harus dapat memvalidasi dan mengaktifkan akun customer yang baru mendaftar | Admin | Must Have |
-| FR-CA-06 | Customer yang sudah terverifikasi harus dapat login dan mengakses dashboard customer | Customer | Must Have |
+| FR-CA-01 | Sistem harus menyediakan halaman registrasi bagi customer baru dengan field: Customer Name, NPWP, PIC Name, Phone Number, Email, Address, Note; Tipe Pelanggan di-default ke "Cargo Owner" oleh sistem dan tidak ditampilkan di form | Customer | Must Have |
+| FR-CA-02 | Customer wajib mengupload 3 dokumen saat registrasi: NPWP (file), NIP (file), Company Profile (file), dengan field tambahan Description, Issue Date, dan Expiry Date opsional per dokumen | Customer | Must Have |
+| FR-CA-03 | Customer Code harus di-generate otomatis oleh sistem setelah Admin menyetujui registrasi; tidak diisi oleh customer | System | Must Have |
+| FR-CA-04 | Admin harus dapat memvalidasi, mengunduh dokumen, dan mengaktifkan atau menolak akun customer yang baru mendaftar | Admin | Must Have |
+| FR-CA-05 | Customer yang sudah terverifikasi harus dapat login dan mengakses dashboard customer | Customer | Must Have |
 
 ## Cross-Cutting Requirements Applicable to This Module
 

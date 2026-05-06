@@ -224,6 +224,7 @@ Body:
   "lps_nomination_id": "uuid",
   "nomination_number": "NOM-20260425-0001",
   "customer_id": "sts_customer_id_from_customers_table",
+  "customer_type": "Cargo Owner",
   "vessel_name": "",
   "eta": "ISO-8601",
   "cargo_type": "",

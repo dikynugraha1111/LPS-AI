@@ -8,7 +8,6 @@
 |-------|------|----------|------------|
 | Customer Code | String | No | Auto-generated on approval; read-only on form |
 | Customer Name | String | Yes | Max 255 chars |
-| Type | Checkbox (multi) | Yes | Min 1 selection; values: Cargo Owner, Shipper, PBM, Agen, Surveyor, Vendor Dozer |
 | NPWP | String | Yes | Format: XX.XXX.XXX.X-XXX.XXX, unique |
 | PIC Name | String | Yes | Max 255 chars |
 | Phone Number | String | Yes | Format: +62XXXXXXXXXX |
@@ -63,7 +62,7 @@ Each document section contains:
   {
     "customer_code": "...",
     "customer_name": "...",
-    "type": ["Cargo Owner", "Shipper"],
+    "type": "Cargo Owner",
     "npwp": "...",
     "pic_name": "...",
     "email": "...",
@@ -101,7 +100,7 @@ CREATE TABLE customers (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_code     VARCHAR(50) UNIQUE,          -- generated on Admin activation
     customer_name     VARCHAR(255) NOT NULL,
-    type              TEXT[]       NOT NULL,        -- e.g. ['Cargo Owner', 'Shipper']
+    type              VARCHAR(50)  NOT NULL DEFAULT 'Cargo Owner', -- always 'Cargo Owner', set by system
     npwp              VARCHAR(20)  NOT NULL UNIQUE,
     pic_name          VARCHAR(255) NOT NULL,
     email             VARCHAR(255) NOT NULL UNIQUE,

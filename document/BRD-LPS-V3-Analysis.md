@@ -211,7 +211,7 @@ Modul yang mengelola seluruh proses registrasi, verifikasi, dan autentikasi cust
 - Menjamin hanya customer terverifikasi yang dapat mengakses portal.
 
 **Cakupan**
-- Registrasi akun customer baru melalui LPS Portal (self-registration) dengan field: Customer Name, Type (multi-select: Cargo Owner, Shipper, PBM, Agen, Surveyor, Vendor Dozer), NPWP, PIC Name, Phone Number, Email, Address, Note.
+- Registrasi akun customer baru melalui LPS Portal (self-registration) dengan field: Customer Name, NPWP, PIC Name, Phone Number, Email, Address, Note. Tipe Pelanggan di-default ke "Cargo Owner" oleh sistem secara otomatis.
 - Upload 3 dokumen wajib saat registrasi: NPWP, NIP, Company Profile (masing-masing dengan Description, Issue Date, Expiry Date opsional).
 - Customer Code di-generate otomatis oleh sistem setelah Admin menyetujui registrasi.
 - Validasi dan review dokumen oleh Admin sebelum akun aktif.
@@ -538,7 +538,7 @@ Sistem menerapkan Role-Based Access Control (RBAC) untuk memastikan setiap pengg
 
 | FR ID | Requirements | Actor |
 |-------|-------------|-------|
-| FR-CA-01 | Sistem harus menyediakan halaman registrasi bagi customer baru dengan field: Customer Name, Type (multi-select: Cargo Owner, Shipper, PBM, Agen, Surveyor, Vendor Dozer), NPWP, PIC Name, Phone Number, Email, Address, Note | Customer |
+| FR-CA-01 | Sistem harus menyediakan halaman registrasi bagi customer baru dengan field: Customer Name, NPWP, PIC Name, Phone Number, Email, Address, Note; Tipe Pelanggan di-default ke "Cargo Owner" oleh sistem dan tidak ditampilkan sebagai field input di form registrasi | Customer |
 | FR-CA-02 | Customer wajib mengupload 3 dokumen saat registrasi: NPWP (file), NIP (file), Company Profile (file), masing-masing dengan field tambahan Description (opsional), Issue Date (opsional), dan Expiry Date (opsional) | Customer |
 | FR-CA-03 | Customer Code harus di-generate otomatis oleh sistem setelah Admin menyetujui registrasi; tidak diisi oleh customer | System |
 | FR-CA-04 | Admin harus dapat memvalidasi, mengunduh dokumen, dan mengaktifkan atau menolak akun customer yang baru mendaftar | Admin |

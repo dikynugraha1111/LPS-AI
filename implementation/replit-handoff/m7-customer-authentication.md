@@ -22,7 +22,7 @@ CREATE TABLE customers (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_code     VARCHAR(50) UNIQUE,          -- generated on Admin activation
     customer_name     VARCHAR(255) NOT NULL,
-    type              TEXT[]       NOT NULL,        -- e.g. {'Cargo Owner','Shipper'}
+    type              VARCHAR(50)  NOT NULL DEFAULT 'Cargo Owner', -- always 'Cargo Owner', set by system
     npwp              VARCHAR(20)  NOT NULL UNIQUE,
     pic_name          VARCHAR(255) NOT NULL,
     email             VARCHAR(255) NOT NULL UNIQUE,
@@ -72,14 +72,12 @@ Run: `golang-migrate -path migrations -database $DATABASE_URL up`
 File: `internal/customer/model.go`
 
 ```go
-import "github.com/lib/pq"
-
 type Customer struct {
-    ID              uuid.UUID      `gorm:"type:uuid;primaryKey"`
-    CustomerCode    *string        `gorm:"uniqueIndex"`
-    CustomerName    string         `gorm:"not null"`
-    Type            pq.StringArray `gorm:"type:text[];not null"`
-    NPWP            string         `gorm:"uniqueIndex;not null"`
+    ID              uuid.UUID  `gorm:"type:uuid;primaryKey"`
+    CustomerCode    *string    `gorm:"uniqueIndex"`
+    CustomerName    string     `gorm:"not null"`
+    Type            string     `gorm:"not null;default:'Cargo Owner'"` // always "Cargo Owner", set by system
+    NPWP            string     `gorm:"uniqueIndex;not null"`
     PICName         string         `gorm:"not null"`
     Email           string         `gorm:"uniqueIndex;not null"`
     Phone           string         `gorm:"not null"`
@@ -155,7 +153,6 @@ Content-Type: `multipart/form-data`
 | Field | Required | Validation |
 |-------|----------|------------|
 | customer_name | Yes | max 255 chars |
-| type[] | Yes | min 1 value; valid values: Cargo Owner, Shipper, PBM, Agen, Surveyor, Vendor Dozer |
 | npwp | Yes | regex: `^\d{2}\.\d{3}\.\d{3}\.\d-\d{3}\.\d{3}$`, unique |
 | pic_name | Yes | max 255 chars |
 | email | Yes | valid email, unique |
@@ -181,7 +178,7 @@ Content-Type: `multipart/form-data`
 2. Check unique email and NPWP; return 409 with field-level error if duplicate.
 3. Hash password: `bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)`.
 4. Save all 3 uploaded files via storage handler → get file URLs.
-5. Create customer record with `status = PENDING_VALIDATION` + 3 `customer_documents` rows (in one transaction).
+5. Create customer record with `status = PENDING_VALIDATION`, `type = "Cargo Owner"` (hardcoded, not from request) + 3 `customer_documents` rows (in one transaction).
 6. Notify admin (in-app notification or log) of new pending registration.
 7. Return 201: `{ "message": "Registrasi berhasil. Akun Anda sedang menunggu validasi Admin." }`.
 
@@ -271,7 +268,7 @@ Body:
   "lps_customer_id": "uuid",
   "customer_code": "CUST-202605-00001",
   "customer_name": "",
-  "type": ["Cargo Owner", "Shipper"],
+  "type": "Cargo Owner",
   "npwp": "",
   "pic_name": "",
   "email": "",
@@ -318,7 +315,6 @@ Header:
 |-------|-------------|-------|
 | Customer Code | Input (disabled) | Placeholder: "Auto-generated on approval"; helper text: "Auto-generated on approval" |
 | Customer Name * | Input | Placeholder: "Enter company name" |
-| Type * | Checkboxes (inline row) | Options: Cargo Owner, Shipper, PBM, Agen, Surveyor, Vendor Dozer |
 | NPWP * | Input | Placeholder: "XX.XXX.XXX.X-XXX.XXX" |
 | PIC Name * | Input | Placeholder: "Enter PIC name" |
 | Phone Number * | Input | Placeholder: "Enter phone number" |
@@ -326,7 +322,9 @@ Header:
 | Address | Textarea | Placeholder: "Enter company address" |
 | Note | Textarea | Placeholder: "Additional notes (optional)" |
 
-Layout: Customer Code and Customer Name are side-by-side (2-col grid). Type is full-width. NPWP and PIC Name are side-by-side. Phone Number and Email are side-by-side. Address and Note are each full-width.
+Layout: Customer Code and Customer Name are side-by-side (2-col grid). NPWP and PIC Name are side-by-side. Phone Number and Email are side-by-side. Address and Note are each full-width.
+
+> **Note:** Field Tipe Pelanggan tidak ditampilkan di form. Sistem otomatis menetapkan `type = "Cargo Owner"` pada saat pembuatan akun.
 
 **Section 2 — Required Documents** (Card with title "Required Documents", subtitle "All documents below are required for registration"):
 
@@ -439,7 +437,7 @@ STS_API_KEY=
 ## Acceptance Checklist
 - [ ] Customer can register with all required fields and 3 required documents
 - [ ] Customer Code field is disabled/read-only in the form with "Auto-generated on approval" placeholder
-- [ ] Type field shows 6 checkboxes: Cargo Owner, Shipper, PBM, Agen, Surveyor, Vendor Dozer (multi-select)
+- [ ] Type field is NOT shown in the form; system sets type = "Cargo Owner" automatically on record creation
 - [ ] Each document section has: File upload, Description, Issue Date, Expiry Date
 - [ ] Form cannot be submitted unless all 3 document files are attached
 - [ ] NPWP field rejects non-standard format
