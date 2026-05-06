@@ -1,4 +1,37 @@
 
+## 2026-05-06T11:00:00+07:00
+- **Task Performed:** Update replit-handoff M7 ke v1.1 (versioning) dan buat file delta baru untuk perubahan Admin Customer Management & Add Customer.
+- **Files Modified:**
+  - `implementation/replit-handoff/m7-customer-authentication.md` — update ke v1.1 dengan version header, DB schema baru, model baru, repository baru, admin handler baru (approve, reject+email, list all, add manual), frontend Step 14 refactor + Step 15 baru, API summary update, acceptance checklist dipisah v1.0 / v1.1
+  - `implementation/replit-handoff/m7-customer-authentication-v1.1-delta.md` — **file baru**, hanya memuat delta perubahan v1.1 (Step A–H: 2 alter migration, model update, repo update, email service, handler update, 3 frontend pages, router update, env vars, acceptance checklist v1.1)
+- **Logic / Decisions Made:**
+  - File existing diupdate dengan versioning di header (v1.0 → v1.1) dan tanda `⚠️ v1.1 change` di setiap section yang berubah — agar mudah dibaca diff-nya.
+  - File delta (v1.1-delta) berdiri sendiri: bisa dijalankan ke Replit Agent secara independen jika v1.0 sudah selesai. Step diberi huruf (A–H) agar tidak bentrok dengan step di file induk.
+  - Endpoint rename: `/activate` → `/approve` (lebih sesuai bahasa UI flow di screenshot).
+  - Email notification: 3 template — approval, rejection, welcome (admin-add). Dikonfigurasi via SMTP env vars + FRONTEND_URL.
+  - Frontend: `PendingCustomersPage` direfactor menjadi `CustomerManagementPage` (full list + filter + detail page); `AddCustomerPage` dibuat baru dengan `useFieldArray` untuk dynamic custom documents.
+- **Results / Next Steps:**
+  - Semua layer dokumentasi (BRD → module → replit-handoff) sudah konsisten untuk fitur Admin Approval dan Admin Add Customer.
+  - Siap dihandoff ke Replit Agent: gunakan `m7-customer-authentication-v1.1-delta.md` jika v1.0 sudah live, atau `m7-customer-authentication.md` untuk fresh implementation.
+
+## 2026-05-06T10:00:00+07:00
+- **Task Performed:** Sinkronisasi 2 fitur baru Admin ke semua layer dokumentasi M7: (1) Customer Approval flow, (2) Admin Add Customer manual dengan custom documents.
+- **Files Modified:**
+  - `document/BRD-LPS-V3-Analysis.md`
+  - `module/customer-authentication/requirements.md`
+  - `module/customer-authentication/specifications.md`
+  - `module/customer-authentication/user-stories.md`
+- **Logic / Decisions Made:**
+  - FR-CA-04 s/d FR-CA-05 lama diganti/diperluas menjadi FR-CA-04 s/d FR-CA-10 untuk memisahkan concern secara eksplisit: list customer (04), view detail (05), approve (06), reject (07), admin add (08), custom docs (09), customer login (10).
+  - Customer Approval: endpoint `PUT /api/admin/customers/:id/approve` (bukan `/activate`) untuk konsistensi bahasa dengan UI flow.
+  - Notifikasi email dikirim pada kedua skenario approve dan reject — ini adalah kebutuhan eksplisit dari screenshot flow yang diberikan.
+  - Admin Add Customer: akun langsung ACTIVE, Customer Code langsung di-generate, tidak ada approval step.
+  - Custom documents: ditandai `is_custom = true` di tabel `customer_documents`. Kolom `doc_label` digunakan untuk nama bebas yang diisi Admin. Kolom `registration_source` di tabel `customers` ditambahkan (`SELF` / `ADMIN`) untuk membedakan asal pembuatan akun.
+  - User stories direfactor: US-CA-02 menjadi "View Customer Management", US-CA-03 Approve, US-CA-04 Reject, US-CA-05 Admin Add Manual, US-CA-06 Customer Login (renumber dari US-CA-03 lama).
+- **Results / Next Steps:**
+  - BRD, requirements, specifications, user-stories sudah sinkron untuk fitur Admin Approval dan Admin Add Customer.
+  - Layer berikutnya yang perlu diupdate: `implementation/replit-handoff/m7-customer-authentication.md` dan `implementation/replit-handoff/m7-m10-customer-portal-ui-prototype.md`.
+
 ## 2026-05-06T04:00:00+07:00
 - **Task Performed:** Sinkronisasi perubahan routing dari Replit ke semua layer dokumentasi.
 - **Files Modified:**

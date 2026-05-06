@@ -1,15 +1,24 @@
 # Replit Handoff — M7: Customer Authentication & Onboarding
 
+> **Version history:**
+> - **v1.0** — Initial handoff: self-registration, admin pending list + activate/reject, login, JWT middleware
+> - **v1.1** — 2026-05-06: Admin Customer Management (full list + filter), Admin Add Customer manual, custom documents, rename activate→approve, notification email on approve/reject, DB schema additions (`registration_source`, `doc_label`, `is_custom`, `uploaded_by`)
+
+---
+
 ## Context
 You are building the **LPS (Local Port System) Platform** — a Vessel Traffic System for PT. TBK's STS Bunati port area. This handoff covers **Module 7: Customer Authentication & Onboarding**, which is the entry point for the Customer Portal.
 
 Customers are companies (Cargo Owner, Shipper, PBM, Agen, Surveyor, Vendor Dozer) who need to register with company documents, get admin approval, and log in before they can submit vessel nominations.
+
+Admin can also add customers directly from the Admin Dashboard (bypassing the self-registration flow), and may attach custom documents beyond the 3 standard ones.
 
 ## Tech Stack
 - **Frontend:** React 19, Vite, TailwindCSS v4, shadcn/ui, wouter (routing), TanStack React Query
 - **Backend:** Go 1.25, jasoet/pkg/v2 (Echo framework, GORM ORM, zerolog logger, config)
 - **Database:** PostgreSQL, golang-migrate
 - **File Storage:** Local disk or S3-compatible (configurable via `STORAGE_DRIVER` env: `local` | `s3`)
+- **Email:** SMTP via env vars (for activation/rejection/welcome notifications)
 
 ---
 
@@ -17,50 +26,63 @@ Customers are companies (Cargo Owner, Shipper, PBM, Agen, Surveyor, Vendor Dozer
 
 ### Migration 1 — `migrations/XXXXXX_create_customers.up.sql`
 
+> ⚠️ **v1.1 change:** Tambah kolom `registration_source` (SELF / ADMIN).
+
 ```sql
 CREATE TABLE customers (
-    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_code     VARCHAR(50) UNIQUE,          -- generated on Admin activation
-    customer_name     VARCHAR(255) NOT NULL,
-    type              VARCHAR(50)  NOT NULL DEFAULT 'Cargo Owner', -- always 'Cargo Owner', set by system
-    npwp              VARCHAR(20)  NOT NULL UNIQUE,
-    pic_name          VARCHAR(255) NOT NULL,
-    email             VARCHAR(255) NOT NULL UNIQUE,
-    phone             VARCHAR(20)  NOT NULL,
-    address           TEXT,
-    note              TEXT,
-    password_hash     VARCHAR(255) NOT NULL,
-    status            VARCHAR(30)  NOT NULL DEFAULT 'PENDING_VALIDATION',
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_code       VARCHAR(50) UNIQUE,          -- generated on Admin approve or manual add
+    customer_name       VARCHAR(255) NOT NULL,
+    type                VARCHAR(50)  NOT NULL DEFAULT 'Cargo Owner',
+    npwp                VARCHAR(20)  NOT NULL UNIQUE,
+    pic_name            VARCHAR(255) NOT NULL,
+    email               VARCHAR(255) NOT NULL UNIQUE,
+    phone               VARCHAR(20)  NOT NULL,
+    address             TEXT,
+    note                TEXT,
+    password_hash       VARCHAR(255) NOT NULL,
+    status              VARCHAR(30)  NOT NULL DEFAULT 'PENDING_VALIDATION',
     -- PENDING_VALIDATION | ACTIVE | REJECTED
-    sts_customer_id   VARCHAR(100),
-    rejection_reason  TEXT,
-    activated_at      TIMESTAMPTZ,
-    activated_by      UUID,  -- FK → lps_users.id
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    registration_source VARCHAR(20)  NOT NULL DEFAULT 'SELF',
+    -- SELF = customer self-registered | ADMIN = added directly by Admin
+    sts_customer_id     VARCHAR(100),
+    rejection_reason    TEXT,
+    activated_at        TIMESTAMPTZ,
+    activated_by        UUID,  -- FK → lps_users.id
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_customers_email  ON customers(email);
-CREATE INDEX idx_customers_status ON customers(status);
-CREATE INDEX idx_customers_npwp   ON customers(npwp);
+CREATE INDEX idx_customers_email               ON customers(email);
+CREATE INDEX idx_customers_status              ON customers(status);
+CREATE INDEX idx_customers_npwp                ON customers(npwp);
+CREATE INDEX idx_customers_registration_source ON customers(registration_source);
 ```
 
 ### Migration 2 — `migrations/XXXXXX_create_customer_documents.up.sql`
+
+> ⚠️ **v1.1 change:** Tambah kolom `doc_label` (untuk custom document name), `is_custom` (flag), `uploaded_by` (CUSTOMER / ADMIN).
 
 ```sql
 CREATE TABLE customer_documents (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id  UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-    doc_type     VARCHAR(50) NOT NULL, -- 'NPWP' | 'NIP' | 'Company Profile'
+    doc_type     VARCHAR(50) NOT NULL,
+    -- Standard: 'NPWP' | 'NIP' | 'Company Profile'
+    -- Custom: free string set by Admin (e.g. 'SIUP', 'Akta Pendirian')
+    doc_label    VARCHAR(100),          -- human-readable label for custom docs; NULL for standard
+    is_custom    BOOLEAN NOT NULL DEFAULT FALSE,
     file_url     TEXT NOT NULL,
     file_name    VARCHAR(255),
     description  TEXT,
     issue_date   DATE,
     expiry_date  DATE,
+    uploaded_by  VARCHAR(20) NOT NULL DEFAULT 'CUSTOMER', -- 'CUSTOMER' | 'ADMIN'
     uploaded_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_customer_documents_customer_id ON customer_documents(customer_id);
+CREATE INDEX idx_customer_documents_is_custom   ON customer_documents(is_custom);
 ```
 
 Run: `golang-migrate -path migrations -database $DATABASE_URL up`
@@ -71,38 +93,48 @@ Run: `golang-migrate -path migrations -database $DATABASE_URL up`
 
 File: `internal/customer/model.go`
 
+> ⚠️ **v1.1 change:** Tambah field `RegistrationSource` di `Customer`; tambah `DocLabel`, `IsCustom`, `UploadedBy` di `CustomerDocument`.
+
 ```go
 type Customer struct {
-    ID              uuid.UUID  `gorm:"type:uuid;primaryKey"`
-    CustomerCode    *string    `gorm:"uniqueIndex"`
-    CustomerName    string     `gorm:"not null"`
-    Type            string     `gorm:"not null;default:'Cargo Owner'"` // always "Cargo Owner", set by system
-    NPWP            string     `gorm:"uniqueIndex;not null"`
-    PICName         string         `gorm:"not null"`
-    Email           string         `gorm:"uniqueIndex;not null"`
-    Phone           string         `gorm:"not null"`
-    Address         *string
-    Note            *string
-    PasswordHash    string         `gorm:"not null"`
-    Status          string         `gorm:"not null;default:'PENDING_VALIDATION'"`
-    STSCustomerID   *string
-    RejectionReason *string
-    ActivatedAt     *time.Time
-    ActivatedBy     *uuid.UUID
-    CreatedAt       time.Time
-    UpdatedAt       time.Time
-    Documents       []CustomerDocument `gorm:"foreignKey:CustomerID"`
+    ID                 uuid.UUID  `gorm:"type:uuid;primaryKey"`
+    CustomerCode       *string    `gorm:"uniqueIndex"`
+    CustomerName       string     `gorm:"not null"`
+    Type               string     `gorm:"not null;default:'Cargo Owner'"`
+    NPWP               string     `gorm:"uniqueIndex;not null"`
+    PICName            string     `gorm:"not null"`
+    Email              string     `gorm:"uniqueIndex;not null"`
+    Phone              string     `gorm:"not null"`
+    Address            *string
+    Note               *string
+    PasswordHash       string     `gorm:"not null"`
+    Status             string     `gorm:"not null;default:'PENDING_VALIDATION'"`
+    // PENDING_VALIDATION | ACTIVE | REJECTED
+    RegistrationSource string     `gorm:"not null;default:'SELF'"`
+    // SELF | ADMIN
+    STSCustomerID      *string
+    RejectionReason    *string
+    ActivatedAt        *time.Time
+    ActivatedBy        *uuid.UUID
+    CreatedAt          time.Time
+    UpdatedAt          time.Time
+    Documents          []CustomerDocument `gorm:"foreignKey:CustomerID"`
 }
 
 type CustomerDocument struct {
     ID          uuid.UUID  `gorm:"type:uuid;primaryKey"`
     CustomerID  uuid.UUID  `gorm:"type:uuid;not null"`
-    DocType     string     `gorm:"not null"` // NPWP | NIP | Company Profile
+    DocType     string     `gorm:"not null"`
+    // Standard: 'NPWP' | 'NIP' | 'Company Profile'
+    // Custom: free string set by Admin
+    DocLabel    *string    // human-readable label for custom docs; nil for standard
+    IsCustom    bool       `gorm:"not null;default:false"`
     FileURL     string     `gorm:"not null"`
     FileName    *string
     Description *string
     IssueDate   *time.Time
     ExpiryDate  *time.Time
+    UploadedBy  string     `gorm:"not null;default:'CUSTOMER'"` // CUSTOMER | ADMIN
     UploadedAt  time.Time
 }
 ```
@@ -113,20 +145,29 @@ type CustomerDocument struct {
 
 File: `internal/customer/repository.go`
 
+> ⚠️ **v1.1 change:** Tambah `FindAll` (dengan filter status), `CreateByAdmin`.
+
 ```go
 type Repository interface {
+    // Shared
     Create(ctx context.Context, customer *Customer, documents []CustomerDocument) error
     FindByEmail(ctx context.Context, email string) (*Customer, error)
     FindByID(ctx context.Context, id uuid.UUID) (*Customer, error)
-    FindPending(ctx context.Context) ([]Customer, error)
     FindDocuments(ctx context.Context, customerID uuid.UUID) ([]CustomerDocument, error)
     UpdateStatus(ctx context.Context, id uuid.UUID, status string, activatedBy *uuid.UUID, rejectionReason *string) error
     SetCustomerCode(ctx context.Context, id uuid.UUID, code string) error
     UpdateSTSCustomerID(ctx context.Context, id uuid.UUID, stsID string) error
+
+    // v1.1: Admin Customer Management
+    FindAll(ctx context.Context, statusFilter string) ([]Customer, error) // statusFilter: "" = all, or "PENDING_VALIDATION" | "ACTIVE" | "REJECTED"
+    FindPending(ctx context.Context) ([]Customer, error)                  // convenience alias for FindAll("PENDING_VALIDATION")
+    CreateByAdmin(ctx context.Context, customer *Customer, standardDocs []CustomerDocument, customDocs []CustomerDocument) error
 }
 ```
 
-`Create` must be transactional: insert `customers` row + all `customer_documents` rows in one DB transaction.
+`Create` dan `CreateByAdmin` harus transaksional: insert `customers` + semua `customer_documents` dalam satu DB transaction.
+
+`CreateByAdmin`: set `registration_source = "ADMIN"`, `status = "ACTIVE"`, generate `customer_code` sebelum insert, set `uploaded_by = "ADMIN"` untuk semua dokumen. Custom docs: `is_custom = true`, `doc_type = doc_label`.
 
 ---
 
@@ -210,6 +251,28 @@ File: `internal/admin/customer_handler.go`
 
 All routes require Admin JWT (`role = admin` or `superadmin`).
 
+> ⚠️ **v1.1 change:** Tambah `GET /api/admin/customers` (full list + filter), `POST /api/admin/customers` (admin add). Rename `activate` → `approve`. Tambah email notification di approve dan reject.
+
+### GET /api/admin/customers
+Query param: `?status=` (optional; blank = all records).
+Returns `[]Customer` ordered `created_at DESC`.
+
+Response shape per item:
+```json
+{
+  "id": "uuid",
+  "customer_code": "CUST-202605-00001",
+  "customer_name": "",
+  "npwp": "",
+  "pic_name": "",
+  "email": "",
+  "phone": "",
+  "status": "ACTIVE",
+  "registration_source": "SELF",
+  "created_at": ""
+}
+```
+
 ### GET /api/admin/customers/pending
 Returns `[]Customer` (with Documents preloaded) where `status = PENDING_VALIDATION`, ordered `created_at ASC`.
 
@@ -218,7 +281,6 @@ Response shape per item:
 {
   "id": "uuid",
   "customer_name": "",
-  "type": ["Cargo Owner"],
   "npwp": "",
   "pic_name": "",
   "email": "",
@@ -226,31 +288,100 @@ Response shape per item:
   "address": "",
   "created_at": "",
   "documents": [
-    { "doc_type": "NPWP", "file_url": "", "file_name": "", "description": "", "issue_date": "", "expiry_date": "" }
+    {
+      "doc_type": "NPWP",
+      "doc_label": null,
+      "is_custom": false,
+      "file_url": "",
+      "file_name": "",
+      "description": "",
+      "issue_date": "",
+      "expiry_date": ""
+    }
   ]
 }
 ```
 
 ### GET /api/admin/customers/:id
-Returns full customer detail + documents. Used for admin review before activate/reject.
+Returns full customer detail + all documents (standard and custom). Used for admin review.
 
-### PUT /api/admin/customers/:id/activate
+### PUT /api/admin/customers/:id/approve
+> ⚠️ **v1.1:** Renamed dari `/activate` → `/approve`. Tambah email notification.
+
 Logic:
-1. Find customer; return 404 if not found or not PENDING_VALIDATION.
-2. Generate `customer_code` — format: `CUST-YYYYMM-XXXXX` (5-digit zero-padded sequence per month, e.g. `CUST-202605-00001`). Ensure uniqueness.
+1. Find customer; return 404 if not found. Return 400 if status ≠ PENDING_VALIDATION.
+2. Generate `customer_code` — format: `CUST-YYYYMM-XXXXX` (5-digit zero-padded sequence per month). Ensure uniqueness via DB unique constraint retry.
 3. Update `status = ACTIVE`, `customer_code`, `activated_at = now()`, `activated_by = admin_id`.
 4. Async: call STS Platform sync (Step 8).
-5. Async: send activation email to customer including their `customer_code`.
+5. Async: send approval email to customer.
+   - Subject: "Akun LPS Portal Anda Telah Diaktifkan"
+   - Body: nama customer, Customer Code, URL login (`FRONTEND_URL/customer/login`).
 6. Log action to audit log.
 7. Return 200 `{ "message": "Akun customer berhasil diaktifkan.", "customer_code": "CUST-202605-00001" }`.
 
 ### PUT /api/admin/customers/:id/reject
 Request body: `{ "reason": "" }` (optional)
+
 Logic:
-1. Update `status = REJECTED`, `rejection_reason = reason`.
-2. Async: send rejection email to customer with reason (if provided).
-3. Log action to audit log.
-4. Return 200 `{ "message": "Akun customer ditolak." }`.
+1. Find customer; return 404 if not found. Return 400 if status ≠ PENDING_VALIDATION.
+2. Update `status = REJECTED`, `rejection_reason = reason`.
+3. Async: send rejection email to customer.
+   - Subject: "Registrasi LPS Portal Anda Ditolak"
+   - Body: nama customer, alasan penolakan (jika diisi), instruksi untuk menghubungi Admin.
+4. Log action to audit log.
+5. Return 200 `{ "message": "Akun customer ditolak." }`.
+
+### POST /api/admin/customers
+> ⚠️ **v1.1:** Endpoint baru — Admin Add Customer manual.
+
+Content-Type: `multipart/form-data`
+
+**Standard form fields** (sama dengan registration):
+| Field | Required |
+|-------|----------|
+| customer_name | Yes |
+| npwp | Yes |
+| pic_name | Yes |
+| email | Yes |
+| phone | Yes |
+| address | No |
+| note | No |
+| password | Yes |
+| doc_npwp_file | Yes |
+| doc_npwp_description | No |
+| doc_npwp_issue_date | No |
+| doc_npwp_expiry_date | No |
+| doc_nip_file | Yes |
+| doc_nip_description | No |
+| doc_nip_issue_date | No |
+| doc_nip_expiry_date | No |
+| doc_company_profile_file | Yes |
+| doc_company_profile_description | No |
+| doc_company_profile_issue_date | No |
+| doc_company_profile_expiry_date | No |
+
+**Custom document fields** (repeatable, 0 or more):
+| Field | Pattern | Required |
+|-------|---------|----------|
+| custom_doc_label | `custom_doc_label[0]`, `custom_doc_label[1]`, … | Yes (per entry) |
+| custom_doc_file | `custom_doc_file[0]`, `custom_doc_file[1]`, … | Yes (per entry) |
+| custom_doc_description | `custom_doc_description[0]`, … | No |
+| custom_doc_issue_date | `custom_doc_issue_date[0]`, … | No |
+| custom_doc_expiry_date | `custom_doc_expiry_date[0]`, … | No |
+
+**Logic:**
+1. Validate all fields; check unique email and NPWP.
+2. Hash password.
+3. Save all files via storage handler.
+4. Build standard `CustomerDocument` slice (3 items, `is_custom = false`, `uploaded_by = "ADMIN"`).
+5. Build custom `CustomerDocument` slice from `custom_doc_*[]` arrays (`is_custom = true`, `doc_label = label`, `doc_type = label`, `uploaded_by = "ADMIN"`).
+6. Generate `customer_code` immediately.
+7. Call `repo.CreateByAdmin(ctx, customer, standardDocs, customDocs)` — transactional.
+8. Async: STS Platform sync (same payload as approve flow).
+9. Async: send welcome email to customer with login credentials.
+   - Subject: "Akun LPS Portal Anda Telah Dibuat"
+   - Body: nama customer, Customer Code, email, password awal, URL login.
+10. Return 201 `{ "message": "Customer berhasil ditambahkan.", "customer_code": "CUST-202605-00002" }`.
 
 ---
 
@@ -389,34 +520,105 @@ Wrap all `/customer/*` routes. On mount:
 
 ---
 
-## Step 14: Frontend — Admin Pending Registrations
+## Step 14: Frontend — Admin Customer Management Page
 
-File: `src/pages/admin/PendingCustomersPage.tsx`
+> ⚠️ **v1.1 change:** Halaman ini menggantikan `PendingCustomersPage.tsx` yang hanya menampilkan pending. Sekarang menampilkan semua customer dengan tab/filter per status, plus tombol "Tambah Customer".
 
-Route: `/admin/customers/pending` (Admin JWT required)
+File: `src/pages/admin/CustomerManagementPage.tsx`
 
-Table columns: Customer Name, NPWP, PIC Name, Email, Phone, Registered At, Actions.
+Route: `/admin/customers` (Admin JWT required; redirect to `/admin/login` if not authenticated)
 
-> **Note:** Route is `/admin/customers/pending`. Admin must be authenticated via Admin JWT (HTTP-only cookie). Redirect to `/admin/login` if not authenticated.
+**Layout:**
+- Page title: "Customer Management"
+- Tombol "Tambah Customer" di kanan atas → navigate to `/admin/customers/new`
+- Tab bar atau filter dropdown: **All** | **Pending** | **Active** | **Rejected**
+- Tabel dengan kolom: No, Customer Name, NPWP, PIC Name, Email, Phone, Status (badge), Source (Self / Admin), Registered At, Actions
 
-Actions per row:
-- "Detail & Dokumen" button → opens Dialog showing full customer info + document list with download links.
-- "Aktivasi" button (green) → `PUT /api/admin/customers/:id/activate` → refresh list → toast "Akun berhasil diaktifkan. Customer Code: [KODE]"
-- "Tolak" button (red) → opens Dialog with optional reason textarea → `PUT /api/admin/customers/:id/reject` → refresh list → toast "Akun ditolak"
+**Status badge colors:**
+- `PENDING_VALIDATION` → yellow / amber
+- `ACTIVE` → green
+- `REJECTED` → red
+
+**Actions per row:**
+- "Detail" button → navigate to `/admin/customers/:id`
+
+**Customer Detail Page** (`src/pages/admin/CustomerDetailPage.tsx`, route `/admin/customers/:id`):
+- Tampilkan semua data Company Information.
+- Section "Documents": daftar semua dokumen. Setiap dokumen menampilkan: nama file, tipe (badge "Standard" atau "Custom"), label (untuk custom doc), tanggal upload, tombol "Download".
+- Jika status = `PENDING_VALIDATION`: tampilkan tombol **"Approve"** (green) dan **"Reject"** (red).
+  - Klik "Approve" → confirm dialog → `PUT /api/admin/customers/:id/approve` → redirect ke `/admin/customers` → toast "Akun berhasil diaktifkan. Customer Code: [KODE]"
+  - Klik "Reject" → modal dengan textarea alasan (opsional) → `PUT /api/admin/customers/:id/reject` → redirect ke `/admin/customers` → toast "Akun ditolak"
+- Jika status bukan PENDING_VALIDATION: tombol Approve/Reject tidak ditampilkan.
+
+---
+
+## Step 15: Frontend — Admin Add Customer Page
+
+> ⚠️ **v1.1: Halaman baru.**
+
+File: `src/pages/admin/AddCustomerPage.tsx`
+
+Route: `/admin/customers/new` (Admin JWT required)
+
+**Section 1 — Company Information** (sama dengan form registrasi customer):
+
+| Field | Required |
+|-------|----------|
+| Customer Name | Yes |
+| NPWP | Yes |
+| PIC Name | Yes |
+| Phone Number | Yes |
+| Email | Yes |
+| Address | No |
+| Note | No |
+| Password (awal) | Yes |
+
+> Customer Code **tidak ditampilkan** di form (akan di-generate otomatis saat save).
+
+**Section 2 — Standard Documents** (sama dengan form registrasi):
+- 3 document cards wajib: NPWP, NIP, Company Profile.
+- Setiap card: File upload (required), Description, Issue Date, Expiry Date.
+
+**Section 3 — Custom Documents** (opsional):
+- Default: kosong (tidak ada custom doc).
+- Tombol **"+ Tambah Dokumen"** menambah satu document card baru.
+- Setiap custom document card memiliki field:
+  - Document Name / Label (Input, required, placeholder: "e.g. SIUP, Akta Pendirian")
+  - File upload (required)
+  - Description (optional)
+  - Issue Date, Expiry Date (optional, side-by-side)
+  - Tombol "×" untuk menghapus card tersebut
+- Tidak ada batas maksimum jumlah custom doc.
+
+**Footer buttons:**
+- "Cancel" (outline) → `/admin/customers`
+- "Simpan Customer" (primary) → submit form
+
+**On submit:**
+- Build `FormData`, append semua standard doc fields, loop custom docs dengan index (`custom_doc_label[0]`, `custom_doc_file[0]`, dsb.).
+- `POST /api/admin/customers`
+- On 201: navigate to `/admin/customers` → toast "Customer berhasil ditambahkan."
+- On 409: tampilkan inline error per field (duplicate email / NPWP).
+
+Gunakan react-hook-form + zod + `useFieldArray` untuk dynamic custom document list.
 
 ---
 
 ## API Endpoints Summary
+
+> ⚠️ **v1.1 changes:** Tambah `GET /api/admin/customers`, `POST /api/admin/customers`. Rename `activate` → `approve`.
 
 | Method | Path | Description | Auth |
 |--------|------|-------------|------|
 | POST | /api/auth/customer/register | Submit registration + documents | Public |
 | POST | /api/auth/customer/login | Login | Public |
 | POST | /api/auth/customer/logout | Logout | Customer JWT |
+| GET | /api/admin/customers | List all customers (filter by status) | Admin JWT |
 | GET | /api/admin/customers/pending | List pending registrations | Admin JWT |
 | GET | /api/admin/customers/:id | Detail + documents | Admin JWT |
-| PUT | /api/admin/customers/:id/activate | Activate + generate code | Admin JWT |
-| PUT | /api/admin/customers/:id/reject | Reject with reason | Admin JWT |
+| PUT | /api/admin/customers/:id/approve | Approve + generate code + send email | Admin JWT |
+| PUT | /api/admin/customers/:id/reject | Reject + send email | Admin JWT |
+| POST | /api/admin/customers | Add customer manually (admin) | Admin JWT |
 
 ---
 
@@ -432,14 +634,22 @@ AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
 STS_PLATFORM_BASE_URL=       # optional; skip sync if not set
 STS_API_KEY=
+FRONTEND_URL=                # used in email notification links (e.g. https://lps.example.com)
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_FROM=                   # e.g. noreply@lps.example.com
 ```
 
 ---
 
 ## Acceptance Checklist
+
+### v1.0 — Self-Registration & Login
 - [ ] Customer can register with all required fields and 3 required documents
 - [ ] Customer Code field is disabled/read-only in the form with "Auto-generated on approval" placeholder
-- [ ] Type field is NOT shown in the form; system sets type = "Cargo Owner" automatically on record creation
+- [ ] Type field is NOT shown in the form; system sets type = "Cargo Owner" automatically
 - [ ] Each document section has: File upload, Description, Issue Date, Expiry Date
 - [ ] Form cannot be submitted unless all 3 document files are attached
 - [ ] NPWP field rejects non-standard format
@@ -447,12 +657,23 @@ STS_API_KEY=
 - [ ] Duplicate NPWP shows inline error: "NPWP sudah terdaftar"
 - [ ] After successful registration, confirmation page is shown
 - [ ] Customer cannot login before activation
-- [ ] Admin can see pending registrations list with document download links
-- [ ] Admin can review full customer detail + documents via "Detail & Dokumen"
-- [ ] Admin can activate → Customer Code is generated → customer status becomes ACTIVE → STS sync attempted
-- [ ] Activation email to customer includes generated Customer Code
-- [ ] Admin can reject with optional reason
 - [ ] ACTIVE customer can login and receives JWT (payload includes customer_code)
 - [ ] JWT is validated on all /customer/* routes
 - [ ] PENDING/REJECTED login attempts show correct error messages
-- [ ] All admin actions are logged to audit log
+
+### v1.1 — Admin Customer Management & Add Customer
+- [ ] Admin Customer Management page menampilkan semua customer dengan filter tab: All / Pending / Active / Rejected
+- [ ] Tabel menampilkan kolom Status (badge warna) dan Source (Self / Admin)
+- [ ] Admin dapat membuka halaman Customer Detail dari tabel
+- [ ] Customer Detail menampilkan semua dokumen; standard doc dan custom doc dibedakan dengan badge
+- [ ] Tombol Approve dan Reject hanya muncul jika status = PENDING_VALIDATION
+- [ ] Approve → Customer Code di-generate → status ACTIVE → email aktivasi terkirim ke customer (berisi Customer Code dan URL login)
+- [ ] Reject → status REJECTED → email penolakan terkirim ke customer (berisi alasan jika diisi)
+- [ ] Admin Add Customer: form dapat disubmit dengan 3 dokumen standar wajib
+- [ ] Admin Add Customer: custom document dapat ditambah dinamis dengan tombol "+ Tambah Dokumen" dan dihapus per card
+- [ ] Customer yang dibuat Admin langsung ACTIVE; Customer Code langsung di-generate
+- [ ] Welcome email terkirim ke customer yang dibuat Admin (berisi email, password awal, Customer Code, URL login)
+- [ ] `registration_source` tersimpan benar: SELF untuk self-register, ADMIN untuk yang dibuat Admin
+- [ ] Custom documents tersimpan dengan `is_custom = true` dan `doc_label` yang benar
+- [ ] STS Platform sync dipanggil untuk approve dan admin-add (tidak untuk reject)
+- [ ] Semua aksi Admin (approve, reject, add customer) tercatat di audit log

@@ -20,22 +20,59 @@
 - [ ] Submit berhasil → redirect ke halaman konfirmasi: "Akun Anda sedang menunggu validasi Admin. Kami akan menghubungi Anda melalui email setelah akun diaktifkan."
 - [ ] Customer tidak dapat login sebelum akun diaktifkan
 
-## US-CA-02: Admin Validates Customer Account
+## US-CA-02: Admin Views Customer Management
 **As an** Admin Kepelabuhan,  
-**I want to** review and activate or reject pending customer registrations,  
-**So that** only verified businesses can use the LPS Portal.
+**I want to** see a list of all customers and their status,  
+**So that** I can monitor and manage customer accounts from one place.
 
 **Acceptance Criteria:**
-- [ ] Admin melihat daftar customer dengan status PENDING_VALIDATION di admin panel
-- [ ] Daftar menampilkan: Customer Name, Type, NPWP, PIC Name, Email, Phone Number, tanggal registrasi
-- [ ] Admin dapat membuka detail registrasi dan mengunduh/mereview dokumen yang diupload (NPWP, NIP, Company Profile)
-- [ ] Tombol "Activate" mengubah status ke ACTIVE, meng-generate Customer Code, dan mentrigger STS Platform sync
-- [ ] Tombol "Reject" membuka modal untuk mengisi alasan penolakan (opsional), lalu mengubah status ke REJECTED
-- [ ] Customer yang diaktifkan menerima email: "Akun Anda telah diaktifkan. Customer Code Anda: [KODE]. Silakan login di [URL]."
-- [ ] Customer yang ditolak menerima email dengan alasan penolakan (jika diisi)
-- [ ] Aksi Admin tercatat di audit log dengan timestamp dan identitas Admin
+- [ ] Halaman Customer Management menampilkan daftar seluruh customer dengan kolom: Customer Name, NPWP, PIC Name, Email, Phone Number, Status, Registration Source (Self / Admin), Created At
+- [ ] Daftar dapat difilter berdasarkan status: All, PENDING_VALIDATION, ACTIVE, REJECTED
+- [ ] Setiap baris memiliki tombol/link untuk membuka halaman detail customer
+- [ ] Halaman Customer Management menampilkan tombol "Tambah Customer" untuk Admin add customer manual
 
-## US-CA-03: Customer Login
+## US-CA-03: Admin Approves Customer Registration
+**As an** Admin Kepelabuhan,  
+**I want to** review and approve pending customer registrations,  
+**So that** only verified businesses can access the LPS Portal.
+
+**Acceptance Criteria:**
+- [ ] Halaman detail customer menampilkan seluruh data Company Information dan daftar dokumen yang diupload
+- [ ] Admin dapat preview dan download setiap dokumen (NPWP, NIP, Company Profile)
+- [ ] Tombol "Approve" hanya tampil jika status = PENDING_VALIDATION
+- [ ] Klik Approve → sistem generate Customer Code, ubah status ke ACTIVE, kirim email aktivasi ke customer, trigger STS Platform sync
+- [ ] Email aktivasi berisi: Customer Code, URL login, informasi akun
+- [ ] Aksi Approve tercatat di audit log dengan timestamp dan identitas Admin
+
+## US-CA-04: Admin Rejects Customer Registration
+**As an** Admin Kepelabuhan,  
+**I want to** reject a customer registration that does not meet requirements,  
+**So that** unqualified entities cannot access the portal.
+
+**Acceptance Criteria:**
+- [ ] Tombol "Reject" hanya tampil jika status = PENDING_VALIDATION
+- [ ] Klik Reject → modal muncul dengan field alasan penolakan (opsional, textarea)
+- [ ] Konfirmasi Reject → status berubah ke REJECTED, email penolakan dikirim ke customer
+- [ ] Email penolakan menyertakan alasan penolakan jika diisi Admin
+- [ ] Aksi Reject tercatat di audit log dengan timestamp, identitas Admin, dan alasan (jika ada)
+
+## US-CA-05: Admin Adds Customer Manually
+**As an** Admin Kepelabuhan,  
+**I want to** add a new customer directly from the Admin Dashboard,  
+**So that** I can onboard customers who were registered outside the self-registration flow.
+
+**Acceptance Criteria:**
+- [ ] Form "Tambah Customer" menampilkan field yang sama dengan form registrasi customer (Company Information + 3 dokumen standar)
+- [ ] Admin wajib mengisi semua field wajib (Customer Name, NPWP, PIC Name, Phone Number, Email) dan mengupload 3 dokumen standar
+- [ ] Admin mengisi password awal untuk akun customer
+- [ ] Akun yang disimpan langsung berstatus ACTIVE; Customer Code langsung di-generate
+- [ ] Sistem trigger STS Platform sync setelah akun berhasil disimpan
+- [ ] Notifikasi email dikirim ke customer berisi informasi akun (email + password awal)
+- [ ] Form menampilkan section "Custom Documents" (opsional): Admin dapat menambahkan satu atau lebih dokumen tambahan dengan field Document Name/Label (wajib), File (wajib), Description, Issue Date, Expiry Date
+- [ ] Setiap custom document yang ditambahkan ditandai dengan `is_custom = true` di database
+- [ ] Aksi pembuatan customer oleh Admin tercatat di audit log
+
+## US-CA-06: Customer Login
 **As an** active Customer,  
 **I want to** log in to the LPS Portal,  
 **So that** I can access the customer dashboard and submit nominations.
