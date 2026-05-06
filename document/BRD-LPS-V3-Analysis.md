@@ -2,8 +2,8 @@
 
 **Disiapkan oleh:** PT Solutionlabs Group Indonesia  
 **Disiapkan untuk:** GK Group & PT Tata Bumi Khatulistiwa (PT TBK)  
-**Versi:** 3.0  
-**Tanggal Update:** April 2026  
+**Versi:** 3.1  
+**Tanggal Update:** Mei 2026  
 **Status:** [DRAFT]
 
 ---
@@ -15,6 +15,7 @@
 | [BRD] Local Port System Platform V2 | 2.0 | Maret 2026 |
 | [BRD] Ship to Ship Platform V2 | 2.0 | Maret 2026 |
 | Mapping Module (Before & After) | — | April 2026 |
+| Swimlane Analysis LPS V3 (screenshot terbaru) | V3 update | Mei 2026 |
 
 ## Document Control
 
@@ -24,15 +25,18 @@
 |----|---------|--------------------------|--------|--------|
 | 1 | Section 2.1 | Modul Master Data & Configuration: dikeluarkan dari scope LPS. Pengelolaan data master (vessel, stakeholder, rate card) dipindahkan ke STS Platform. LPS hanya mempertahankan sub-modul System Configuration. | HAPUS / PINDAH | Mapping Module Revision |
 | 2 | Section 2.1 | Modul Reporting & Analytics: dikeluarkan dari scope LPS. Digantikan oleh modul Monitoring & Visibility Dashboard yang berfokus pada monitoring real-time saja. | HAPUS / GANTI | Mapping Module Revision |
-| 3 | Section 2.1 | Modul Billing & Service Charge Management: dikeluarkan dari scope LPS. Seluruh proses billing, invoice, dan PNBP dikelola oleh STS Platform. | HAPUS / PINDAH | Mapping Module Revision |
+| 3 | Section 2.1 | Modul Billing & Service Charge Management: dikeluarkan dari scope LPS. Seluruh proses kalkulasi billing, PNBP, dan invoice generation dikelola oleh STS Platform. **Namun menu EPB & Invoice di Customer Portal LPS dipertahankan** sebagai interface upload bukti pembayaran dan monitoring status payment (Unpaid, Pending Review, Payment Reject, Paid). | REVISI PARSIAL | Swimlane V3 Screenshot Terbaru |
 | 4 | Section 2.1 | Modul Nomination Request (Customer Portal): ditambahkan ke scope LPS. Customer mengajukan nominasi melalui LPS Portal, data diteruskan ke STS Platform untuk proses selanjutnya. | TAMBAH | Mapping Module Revision + BRD STS |
 | 5 | Section 2.1 | Modul Monitoring & Visibility Dashboard: ditambahkan sebagai pengganti Reporting & Analytics, fokus pada real-time operational monitoring. | TAMBAH | Mapping Module Revision |
 | 6 | Section 2.2 | Out of Scope: ditambahkan Master Data Management, Billing & Invoice, Reporting & Analytics sebagai tanggung jawab STS Platform. | UPDATE | Mapping Module Revision |
 | 7 | Section 3.3 | Role & Access Control: role Finance dihapus dari LPS. Role Customer (Pemilik Kapal/Shipper) ditambahkan untuk Nomination. | UPDATE | Mapping Module Revision |
-| 8 | Section 3.4 | Functional Requirements: hapus FR Billing (3.4.6), FR Reporting (3.4.7), FR Master Data (3.4.8). Tambah FR Nomination Request dan FR Monitoring Dashboard. | UPDATE | Mapping Module Revision |
+| 8 | Section 3.4 | Functional Requirements: hapus FR Billing (3.4.6), FR Reporting (3.4.7), FR Master Data (3.4.8). Tambah FR Nomination Request dan FR Monitoring Dashboard. **Tambah FR-NP-12 s/d FR-NP-15 untuk EPB & Invoice menu (Customer Portal).** | UPDATE | Mapping Module Revision + Swimlane V3 Screenshot Terbaru |
 | 9 | Section 3.5 | Non-Functional Requirements: tambah NFR integrasi API STS Platform. Hapus referensi billing accuracy. | UPDATE | Mapping Module Revision |
 | 10 | Section 5 | Risk Area: hapus risk PNBP/billing formula. Tambah risk integrasi STS-LPS API dependency. | UPDATE | Mapping Module Revision |
 | 11 | Section 6 | Acceptance Criteria: hapus SC billing. Tambah SC Nomination flow dan integrasi STS Platform. | UPDATE | Mapping Module Revision |
+| 12 | Section 2.1 | M9 direvisi: scope dipersempit menjadi "Nomination Status & EPB Confirmation" saja. M9b baru ditambahkan: "EPB & Invoice (Customer Portal)" dengan 4 status payment (Unpaid, Pending Review, Payment Reject, Paid). | TAMBAH / REVISI | Swimlane V3 Screenshot Terbaru (Mei 2026) |
+| 13 | Section 3.4.9 | FR-NP direvisi: FR-NP-08 s/d FR-NP-11 (siklus payment di M9) dipindahkan ke section 3.4.9b sebagai FR-EI-01 s/d FR-EI-08. FR-NP-07 direvisi: setelah submit bukti bayar pertama, data dipindahkan ke menu EPB & Invoice. | REVISI | Swimlane V3 Screenshot Terbaru (Mei 2026) |
+| 14 | Section 2.2 | Out of Scope item 8 diklarifikasi: billing calculation tetap di STS, namun EPB & Invoice interface (Customer Portal) tetap di LPS. | KLARIFIKASI | Swimlane V3 Screenshot Terbaru (Mei 2026) |
 
 ---
 
@@ -83,7 +87,8 @@ Sistem LPS dan STS Platform beroperasi sebagai **dua sistem terpisah yang terhub
 | Monitoring & Visibility Dashboard | ✅ Real-time dashboard | — |
 | System Configuration | ✅ Mengelola (API, weather threshold, alert, user/role) | — |
 | Master Data (Vessel, Stakeholder, Rate Card) | Konsumsi via API | ✅ Mengelola (CRUD) |
-| Billing & Service Charge | — | ✅ Mengelola |
+| Billing & Service Charge (kalkulasi, invoice, reconciliation) | — | ✅ Mengelola |
+| EPB & Invoice Customer Portal (upload bukti bayar, monitoring status payment) | ✅ Interface customer | Verifikasi & keputusan |
 | Reporting & Analytics | — | ✅ Mengelola |
 | Voyage Lifecycle Mgmt | — | ✅ Mengelola |
 | Field Operation Mgmt | — | ✅ Mengelola |
@@ -237,33 +242,55 @@ Modul yang mengelola proses pengajuan nominasi kapal oleh customer melalui LPS P
 - Generate Nomor Nominasi otomatis setelah submit.
 - Pengiriman data nominasi ke STS Platform via API setelah submit.
 
-#### 9. Nomination Status & Payment — **BARU**
+#### 9. Nomination Status & EPB Confirmation — **BARU** *(direvisi berdasarkan Swimlane V3)*
 
 **Definisi**  
-Modul yang mengelola seluruh proses setelah nominasi disubmit: pemantauan status, tampilan EPB, upload bukti pembayaran, dan penerimaan hasil verifikasi dari STS Platform. Berakhir ketika status menjadi "Payment Confirmed" dan voyage dapat dimulai.
+Modul yang mengelola proses setelah nominasi disubmit hingga customer melakukan upload bukti pembayaran pertama kali (EPB Confirmation). Siklus verifikasi payment selanjutnya dikelola oleh menu EPB & Invoice (lihat M9b di bawah).
 
 **Tujuan**
 - Menyediakan visibilitas status nominasi secara real-time kepada customer.
-- Memfasilitasi proses upload bukti pembayaran sesuai EPB dari STS Platform.
-- Menerima dan menampilkan hasil verifikasi pembayaran dari STS Platform.
+- Memfasilitasi konfirmasi EPB dan upload bukti pembayaran pertama.
+- Memfasilitasi revisi nominasi jika STS Platform meminta perubahan data.
 
 **Cakupan**
 
 *Status Tracking*
-- Customer dapat melihat status nominasi dengan lifecycle lengkap: **Draft** → **Submitted** → **Pending** (Menunggu proses di STS Platform) → **Approved** / **Need Revision** → **Waiting Payment Verification** → **Payment Confirmed** / **Payment Rejected**.
+- Customer dapat melihat status nominasi: **Draft** → **Submitted** → **Pending** (Menunggu proses di STS Platform) → **Approved** / **Need Revision**.
 - Customer menerima notifikasi saat status nominasi berubah.
 - Customer dapat melakukan revisi data nominasi jika status = Need Revision, kemudian re-submit ke STS Platform.
 
-*EPB & Jadwal*
-- Customer dapat melihat EPB (Estimasi Perkiraan Biaya) yang digenerate oleh STS Platform beserta nominal yang harus dibayarkan (view-only).
-- Customer dapat melihat detail jadwal (anchor point, ETB, estimasi durasi) setelah nominasi di-approve.
+*EPB Confirmation (Jika Approved)*
+- Customer melihat EPB (Estimasi Perkiraan Biaya) yang digenerate oleh STS Platform beserta detail data: schedule, dock, dan nominal yang harus dibayarkan (view-only).
+- Customer mengupload bukti pembayaran pertama (Proof of Payment) dan mengisi data terkait.
+- Setelah Submit, data bukti bayar **dipindahkan ke menu EPB & Invoice** untuk siklus verifikasi selanjutnya.
 
-*Payment Proof Upload*
-- Customer mengupload bukti pembayaran (Proof of Payment) sesuai EPB yang diterima. Format: PDF, JPG, PNG (max 5MB per file).
-- Data bukti bayar dikirimkan ke STS Platform via API. Status berubah menjadi "Waiting Payment Verification".
-- STS Platform melakukan verifikasi. Jika Confirmed: status → "Payment Confirmed" dan voyage dapat dimulai. Jika Rejected: customer menerima notifikasi beserta alasan dan dapat mengupload ulang.
+> **Batasan Modul:** LPS hanya berfungsi sebagai portal konfirmasi dan upload pertama. Proses approval, resource assignment, scheduling, generate EPB, dan verifikasi pembayaran seluruhnya dilakukan oleh STS Platform. Siklus Unpaid → Pending Review → Payment Reject → Paid dikelola di menu EPB & Invoice (M9b).
 
-> **Batasan Modul:** LPS hanya berfungsi sebagai portal upload dan monitoring. Proses approval, resource assignment, scheduling, generate EPB, dan verifikasi pembayaran seluruhnya dilakukan oleh STS Platform.
+#### 9b. EPB & Invoice (Customer Portal) — **BARU** *(diidentifikasi dari Swimlane V3 Screenshot Terbaru)*
+
+**Definisi**  
+Menu dalam Customer Portal LPS yang berfungsi sebagai interface pemantauan status pembayaran EPB dan manajemen revisi bukti pembayaran. Data EPB di-generate oleh STS Platform; LPS hanya menampilkan dan mengelola proses upload/revisi bukti bayar.
+
+**Tujuan**
+- Menyediakan visibilitas status payment EPB bagi customer.
+- Memfasilitasi upload ulang bukti pembayaran jika sebelumnya ditolak.
+- Menjadi single place bagi customer untuk memantau semua EPB & Invoice mereka.
+
+**Cakupan**
+
+*4 Status Payment*
+- **Unpaid:** EPB telah diterima namun belum ada pembayaran. Customer dapat klik "Pay" untuk memulai proses upload.
+- **Pending Review:** Bukti pembayaran sudah disubmit, menunggu verifikasi dari STS Platform (view-only).
+- **Payment Reject:** Bukti pembayaran ditolak oleh STS Platform. Customer dapat klik "Revision Data" untuk mengupload ulang bukti bayar yang benar.
+- **Paid:** Pembayaran telah dikonfirmasi oleh STS Platform (view-only).
+
+*Flow per Status*
+- **Unpaid:** `Click Pay → Upload Payment Proof and fill the data → Submit Data`
+- **Pending Review:** View-only, menunggu verifikasi
+- **Payment Reject:** `Click Revision Data → Upload Payment Proof and fill the data → Submit`
+- **Paid:** View-only, completed
+
+> **Batasan:** Verifikasi pembayaran (keputusan Confirmed/Rejected) sepenuhnya dilakukan oleh STS Platform. LPS hanya menerima status update dari STS Platform dan menampilkan hasilnya ke customer.
 
 #### 10. Customer Dashboard & Monitoring — **BARU**
 
@@ -347,7 +374,7 @@ Sub-modul yang mengelola konfigurasi sistem LPS, pengelolaan user dan role, sert
 5. Perubahan regulasi perpajakan di luar konfigurasi parameter.
 6. **Master Data Management** — pengelolaan CRUD data vessel, stakeholder, zona perairan, anchor point, rate card (dikelola oleh STS Platform).
 7. **Zones & Anchor Point Management** — pengelolaan CRUD zona perairan dan anchor point (dikelola oleh STS Platform). LPS mengkonsumsi data ini via API untuk keperluan monitoring.
-8. **Billing & Service Charge Management** — seluruh proses kalkulasi biaya layanan, PNBP, invoice, dan payment reconciliation (dikelola oleh STS Platform).
+8. **Billing & Service Charge Management** — seluruh proses kalkulasi biaya layanan, PNBP, generate invoice, dan payment reconciliation (dikelola oleh STS Platform). **Catatan:** LPS mempertahankan menu EPB & Invoice di Customer Portal sebatas interface upload bukti pembayaran dan monitoring status; kalkulasi dan verifikasi tetap di STS Platform.
 9. **Reporting & Analytics** — laporan periodik operasional dan finansial, export PDF/Excel (dikelola oleh STS Platform).
 10. **Nomination approval, scheduling, dan resource assignment** — proses approval nominasi, pengecekan ketersediaan, penjadwalan, dan assignment resource (dikelola oleh STS Platform).
 
@@ -391,7 +418,8 @@ Berikut adalah asumsi yang digunakan dalam penyusunan Business Requirement Docum
 | M6 | Radar & Navigation Surveillance | Navigasi |
 | M7 | Customer Authentication & Onboarding | Customer Portal |
 | M8 | Nomination Request Submission | Customer Portal |
-| M9 | Nomination Status & Payment | Customer Portal |
+| M9 | Nomination Status & EPB Confirmation | Customer Portal |
+| M9b | EPB & Invoice (Customer Portal) | Customer Portal |
 | M10 | Customer Dashboard & Monitoring | Customer Portal |
 | M11 | Monitoring & Visibility Dashboard | Monitoring |
 | M12 | System Configuration | Konfigurasi |
@@ -400,15 +428,20 @@ Berikut adalah asumsi yang digunakan dalam penyusunan Business Requirement Docum
 
 **PHASE 1 — Pre-Arrival (Nomination & Payment)**
 1. Customer login ke LPS Portal.
-2. Customer mengajukan nominasi: isi form, upload dokumen, submit.
+2. Customer mengajukan nominasi: isi form, upload dokumen, submit. (M8)
 3. Data nominasi dikirim ke STS Platform via API.
 4. STS Platform melakukan pengecekan ketersediaan, approval, resource assignment.
-5. Status update (Approved/Need Revision) diterima LPS dari STS Platform.
-6. Setelah Approved, STS Platform mengirimkan EPB ke LPS → Customer melihat EPB di LPS Portal.
-7. Customer mengupload bukti pembayaran (Proof of Payment) di LPS Portal sesuai EPB.
-8. Bukti pembayaran dikirim ke STS Platform via API → Status menjadi "Waiting Payment Verification".
-9. STS Platform memverifikasi pembayaran → Hasil (Confirmed/Rejected) dikirim ke LPS.
-10. Jika Payment Confirmed → Voyage dapat dimulai.
+5. Status update (Approved/Need Revision/Pending) diterima LPS dari STS Platform. (M9)
+   - Jika **Need Revision (False branch)**: Customer update data nominasi → re-submit ke STS Platform.
+   - Jika **Approved (True branch)**: lanjut ke langkah 6.
+6. Setelah Approved, STS Platform mengirimkan EPB ke LPS → Customer melihat EPB di LPS Portal (schedule, dock, nominal). (M9)
+7. Customer mengupload bukti pembayaran (Proof of Payment) pertama dan mengisi data → Submit. (M9 — EPB Confirmation)
+8. Data bukti bayar **dipindahkan ke menu EPB & Invoice** (M9b). Status awal: **Unpaid** atau langsung **Pending Review** jika submit berhasil.
+9. Di menu EPB & Invoice (M9b), siklus verifikasi berjalan:
+   - **Pending Review**: menunggu verifikasi STS Platform.
+   - **Payment Reject**: Customer klik "Revision Data" → upload ulang bukti bayar → re-submit.
+   - **Paid**: STS Platform konfirmasi → Payment selesai.
+10. Jika status **Paid** → Voyage dapat dimulai.
 11. Kapal mendekati area perairan → M1 (AIS) mendeteksi posisi.
 12. M6 (RADAR) melakukan cross-check deteksi.
 13. Alert otomatis jika kapal masuk zona → LPS Operator mendapat notifikasi.
@@ -463,7 +496,8 @@ Sistem menerapkan Role-Based Access Control (RBAC) untuk memastikan setiap pengg
 | Radar & Navigation | Full | — | Full | Full | View | — | — | View |
 | Customer Authentication | — | — | — | Approve Reg. / Add Customer | — | — | Register & Login | View |
 | Nomination Submission | — | — | — | View | — | — | Full | View |
-| Nomination Status & Payment | — | — | — | View | — | — | Full | View |
+| Nomination Status & EPB Confirmation | — | — | — | View | — | — | Full | View |
+| EPB & Invoice (Customer Portal) | — | — | — | View | — | — | Full | View |
 | Customer Dashboard & Monitoring | — | — | — | View | — | — | Full | View |
 | Monitoring Dashboard | Full | View | View | Full | View | View | View (limited) | Full |
 | System Configuration | — | — | — | Limited | — | — | — | Full |
@@ -561,21 +595,30 @@ Sistem menerapkan Role-Based Access Control (RBAC) untuk memastikan setiap pengg
 | FR-NS-04 | Sistem harus mengenerate Nomor Nominasi otomatis setelah customer melakukan Submit | System |
 | FR-NS-05 | Sistem harus mengirimkan data nominasi ke STS Platform via API setelah customer melakukan Submit | System |
 
-#### 3.4.9. Nomination Status & Payment — **BARU**
+#### 3.4.9. Nomination Status & EPB Confirmation — **BARU** *(direvisi berdasarkan Swimlane V3)*
 
 | FR ID | Requirements | Actor |
 |-------|-------------|-------|
 | FR-NP-01 | Sistem harus menerima status update nominasi dari STS Platform (Pending, Approved, Need Revision) dan menampilkannya ke customer. Status Pending ditampilkan dengan label "Menunggu proses di STS Platform". | System |
-| FR-NP-02 | Customer harus dapat melihat EPB (Estimasi Perkiraan Biaya) yang digenerate oleh STS Platform beserta detail nominal yang harus dibayarkan | Customer |
-| FR-NP-03 | Customer harus dapat melihat detail jadwal (anchor point, ETB, estimasi durasi) setelah nominasi di-approve oleh STS Platform | Customer |
+| FR-NP-02 | Jika nominasi berstatus Approved, customer harus dapat melihat EPB (Estimasi Perkiraan Biaya) yang digenerate oleh STS Platform beserta detail: schedule, dock, dan nominal yang harus dibayarkan (view-only) | Customer |
+| FR-NP-03 | Customer harus dapat melihat detail jadwal (schedule, dock) setelah nominasi di-approve oleh STS Platform | Customer |
 | FR-NP-04 | Sistem harus mengirim notifikasi ke customer saat status nominasi berubah | System |
-| FR-NP-05 | Customer harus dapat melakukan revisi data nominasi jika status = Need Revision, kemudian re-submit | Customer |
-| FR-NP-06 | Customer harus dapat mengupload bukti pembayaran (Proof of Payment) melalui LPS Portal sesuai dengan EPB yang diterima dari STS Platform. Format yang didukung: PDF, JPG, PNG (max 5MB) | Customer |
-| FR-NP-07 | Sistem harus mengirimkan data bukti pembayaran yang diupload customer ke STS Platform via API untuk proses verifikasi | System |
-| FR-NP-08 | Setelah customer mengupload bukti pembayaran, status nominasi harus berubah menjadi "Waiting Payment Verification" | System |
-| FR-NP-09 | Sistem harus menerima hasil verifikasi pembayaran dari STS Platform (Confirmed/Rejected) dan menampilkannya ke customer | System |
-| FR-NP-10 | Jika pembayaran ditolak oleh STS Platform, customer harus menerima notifikasi beserta alasan penolakan dan dapat mengupload ulang bukti pembayaran yang benar | Customer |
-| FR-NP-11 | Setelah pembayaran dikonfirmasi oleh STS Platform, status nominasi berubah menjadi "Payment Confirmed" dan voyage dapat dimulai | System |
+| FR-NP-05 | Customer harus dapat melakukan revisi data nominasi jika status = Need Revision (branch False pada decision node "Is Approved?"), kemudian re-submit ke STS Platform | Customer |
+| FR-NP-06 | Customer harus dapat mengupload bukti pembayaran pertama (Proof of Payment) beserta data terkait melalui halaman EPB Confirmation di LPS Portal. Format yang didukung: PDF, JPG, PNG (max 5MB) | Customer |
+| FR-NP-07 | Setelah customer Submit pada halaman EPB Confirmation, data bukti pembayaran dipindahkan ke menu EPB & Invoice untuk siklus verifikasi selanjutnya | System |
+
+#### 3.4.9b. EPB & Invoice (Customer Portal) — **BARU** *(diidentifikasi dari Swimlane V3 Screenshot Terbaru)*
+
+| FR ID | Requirements | Actor |
+|-------|-------------|-------|
+| FR-EI-01 | Sistem harus menyediakan menu EPB & Invoice di Customer Portal yang menampilkan daftar seluruh EPB customer beserta status pembayaran terkini | Customer |
+| FR-EI-02 | Customer harus dapat melihat detail EPB dan Invoice (view-only) dengan mengklik item di daftar EPB & Invoice | Customer |
+| FR-EI-03 | Untuk EPB berstatus **Unpaid**, customer harus dapat memulai proses pembayaran dengan mengklik tombol "Pay", kemudian mengupload bukti pembayaran dan mengisi data terkait, kemudian Submit | Customer |
+| FR-EI-04 | Untuk EPB berstatus **Pending Review**, sistem harus menampilkan status dalam mode view-only; tidak ada aksi yang dapat dilakukan customer hingga STS Platform memberikan keputusan | Customer |
+| FR-EI-05 | Untuk EPB berstatus **Payment Reject**, customer harus dapat mengklik "Revision Data" untuk mengupload ulang bukti pembayaran yang benar dan melakukan re-submit | Customer |
+| FR-EI-06 | Untuk EPB berstatus **Paid**, sistem harus menampilkan detail dalam mode view-only sebagai konfirmasi bahwa pembayaran telah selesai | Customer |
+| FR-EI-07 | Sistem harus menerima status update pembayaran dari STS Platform (Pending Review → Payment Reject / Paid) dan memperbarui tampilan di menu EPB & Invoice secara real-time | System |
+| FR-EI-08 | Sistem harus mengirimkan data bukti pembayaran (upload dari FR-EI-03 atau FR-EI-05) ke STS Platform via API untuk proses verifikasi | System |
 
 #### 3.4.10. Customer Dashboard & Monitoring — **BARU**
 
@@ -750,15 +793,18 @@ Data master entity berikut kini dikelola oleh STS Platform:
 
 LPS mengkonsumsi data ini melalui API sinkronisasi dari STS Platform.
 
-### A.2 Billing & Service Charge Management (Dipindahkan)
+### A.2 Billing & Service Charge Management (Dipindahkan ke STS Platform — sebagian besar)
 
-Seluruh fungsi berikut kini dikelola oleh STS Platform:
+Fungsi-fungsi berikut kini dikelola oleh STS Platform:
 - Kalkulasi biaya layanan kepelabuhan
 - Kalkulasi PNBP
-- Generate tagihan otomatis
+- Generate tagihan/invoice otomatis
 - Approval workflow billing
-- Invoice delivery
+- Payment reconciliation
 - Integrasi ERP
+
+**Yang tetap di LPS (Customer Portal):**
+- Menu EPB & Invoice: interface untuk customer melihat detail EPB, mengupload bukti pembayaran, dan memantau status payment (Unpaid / Pending Review / Payment Reject / Paid). Verifikasi pembayaran tetap dilakukan oleh STS Platform; LPS hanya menerima dan menampilkan hasilnya.
 
 ### A.3 Reporting & Analytics (Dipindahkan)
 

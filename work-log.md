@@ -1,4 +1,24 @@
 
+## 2026-05-06T13:00:00+07:00
+- **Task Performed:** Gap analysis Swimlane V3 vs BRD V3, lalu update BRD untuk sinkronisasi. BRD dinaikkan ke v3.1.
+- **Files Modified:**
+  - `document/BRD-LPS-V3-Analysis.md` — versi naik ke 3.1, 6 lokasi diupdate
+- **Logic / Decisions Made:**
+  - **Gap 1 — EPB & Invoice menu tidak ada di BRD:** Swimlane terbaru mengkonfirmasi menu ini tetap ada di Customer Portal LPS dengan 4 status payment. BRD sebelumnya merekomendasikan dihapus. Fix: ditambahkan sebagai **M9b** dengan scope dan 8 FR baru (FR-EI-01 s/d FR-EI-08).
+  - **Gap 2 — EPB Confirmation flow di M9 terlalu kompleks:** BRD M9 menggabungkan EPB Confirmation + siklus verifikasi payment dalam satu modul. Swimlane terbaru memisahkan keduanya: M9 hanya sampai "Submit → data pindah ke EPB & Invoice menu", siklus Unpaid/Pending/Reject/Paid ada di M9b. Fix: M9 direvisi namanya menjadi "Nomination Status & EPB Confirmation", scope dan FR dipersempit; FR-NP-08 s/d FR-NP-11 (yang dulu) dipindahkan ke FR-EI-* di section baru.
+  - **Gap 3 — Tabel modul tidak mencantumkan M9b:** Fix: ditambahkan di tabel section 3.1.
+  - **Gap 4 — Tabel hubungan LPS-STS di section 1.3 tidak akurat:** Billing row terlalu simpel. Fix: dipisah menjadi 2 baris — STS mengelola kalkulasi/invoice/reconciliation; LPS mengelola EPB & Invoice interface (Customer Portal).
+  - **Gap 5 — Out of Scope item 8 ambigu:** Bisa salah dibaca bahwa LPS tidak boleh punya apapun terkait billing. Fix: ditambahkan catatan klarifikasi.
+  - **Gap 6 — Appendix A.2 tidak konsisten:** Fix: ditambahkan sub-section "Yang tetap di LPS" untuk EPB & Invoice Customer Portal.
+  - **Extra Features (Customer Approval + Add Customer By Admin):** sudah ada di BRD (FR-CA-06 s/d FR-CA-09) — tidak ada gap.
+  - **Operator Swimlane:** tidak ada gap dengan BRD.
+- **Results / Next Steps:**
+  - BRD v3.1 kini sinkron dengan Swimlane V3 terbaru.
+  - Module yang perlu perhatian di layer implementasi:
+    - M9 `module/nomination-status-payment/` perlu diupdate (scope baru: sampai EPB Confirmation saja)
+    - M9b belum punya `module/` folder — perlu dibuat, atau digabung ke M9 dengan sub-section
+    - `implementation/replit-handoff/m9-nomination-status-payment.md` perlu direvisi untuk mencerminkan pemisahan ini
+
 ## 2026-05-06T12:00:00+07:00
 - **Task Performed:** Update Swimlane Analysis LPS V3 berdasarkan screenshot Swimlane terbaru dari tim.
 - **Files Modified:**
