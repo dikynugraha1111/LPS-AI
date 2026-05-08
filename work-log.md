@@ -1,4 +1,45 @@
 
+## 2026-05-07T01:00:00+07:00
+- **Task Performed:** Analisis dampak perubahan M9/M9b terhadap M10 dan sinkronisasi yang diperlukan.
+- **Files Modified:**
+  - `module/customer-dashboard-monitoring/README.md` — tambah Key Decision baru: M10 hanya baca tabel `nominations`; status payment ada di `epb_payments` (M9b); nominasi `EPB_CONFIRMATION_SUBMITTED` menampilkan shortcut ke M9b
+  - `module/customer-dashboard-monitoring/specifications.md` — dua update: (1) status list di §2 diganti `WAITING_PAYMENT_VERIFICATION`/`PAYMENT_REJECTED` → `EPB_CONFIRMATION_SUBMITTED` + catatan penjelasan; (2) "Active filter" ditambah catatan excludes `EPB_CONFIRMATION_SUBMITTED`
+  - `implementation/replit-handoff/m10-customer-dashboard-monitoring.md` — empat update: (1) query `active_nominations` tambah `EPB_CONFIRMATION_SUBMITTED` di exclude list; (2) `statusLabels` map hapus `WAITING_PAYMENT_VERIFICATION`/`PAYMENT_REJECTED`, tambah `EPB_CONFIRMATION_SUBMITTED`; (3) filter `?filter=active` exclude `EPB_CONFIRMATION_SUBMITTED`; (4) status badge colors hapus `WAITING_PAYMENT_VERIFICATION`/`PAYMENT_REJECTED`, ganti dengan `EPB_CONFIRMATION_SUBMITTED` (teal + link ke M9b); (5) sidebar nav tambah "EPB & Invoice → /customer/epb-invoice"
+- **Logic / Decisions Made:**
+  - M10 requirements (FR-CD-01 s/d FR-CD-08) dan user-stories tidak berubah — semuanya masih valid.
+  - Perubahan bersifat teknis: menyesuaikan referensi status lama M9 dengan status baru setelah pemisahan M9/M9b.
+  - `EPB_CONFIRMATION_SUBMITTED` dikecualikan dari filter "Active" karena dari perspektif M10, aksi customer sudah berpindah ke M9b. Nominasi ini tetap tampil di tab "All" agar customer masih bisa melihat riwayat.
+  - Sidebar nav M10 ditambah "EPB & Invoice" sebagai navigasi global ke M9b — konsisten dengan M9b handoff Step 9.
+- **Results / Next Steps:**
+  - Semua 4 layer M10 kini sinkron dengan BRD v3.1.
+  - Seluruh pipeline M7 → M8 → M9 → M9b → M10 sudah konsisten dan siap dihandoff ke Replit Agent secara sequential.
+  - Tidak ada modul lain yang terdampak — M8, M11, M12 tidak memiliki referensi ke status payment M9 lama.
+
+## 2026-05-07T00:00:00+07:00
+- **Task Performed:** Sinkronisasi penuh M9 dan pembuatan M9b berdasarkan perubahan BRD v3.1 (Swimlane V3). Meliputi update 4 layer pipeline implementasi untuk M9, dan pembuatan dari nol untuk M9b.
+- **Files Modified:**
+  - `module/nomination-status-payment/README.md` — judul diubah ke "Nomination Status & EPB Confirmation", boundaries direvisi: scope baru hanya sampai EPB Confirmation submit; out-of-scope ditambah payment verification cycle (M9b)
+  - `module/nomination-status-payment/requirements.md` — FR-NP-08 s/d FR-NP-11 dihapus (dipindah ke M9b sebagai FR-EI-01 s/d FR-EI-08); FR-NP-07 direvisi: setelah Submit EPB Confirmation, data dipindahkan ke menu EPB & Invoice (M9b)
+  - `module/nomination-status-payment/specifications.md` — rewrite penuh: status lifecycle dipersingkat (tidak ada WAITING_PAYMENT_VERIFICATION/PAYMENT_CONFIRMED/PAYMENT_REJECTED); Step 5 (EPB Confirmation flow) direvisi: setelah submit membuat row `epb_payments` di M9b dan set status `EPB_CONFIRMATION_SUBMITTED`; STS webhook dibatasi hanya APPROVED dan NEED_REVISION
+  - `module/nomination-status-payment/user-stories.md` — US-NP-04 dan US-NP-05 (payment verification) dihapus; US-NP-04 baru dibuat: "Submit EPB Confirmation (First Payment Proof)" dengan AC yang benar
+  - `implementation/replit-handoff/m9-nomination-status-payment.md` — rewrite penuh ke v2.0: Step 6 diubah dari "Payment Proof Upload → WAITING_PAYMENT_VERIFICATION" menjadi "EPB Confirmation Submit → create epb_payments(UNPAID) + redirect ke M9b"; status `WAITING_PAYMENT_VERIFICATION`, `PAYMENT_CONFIRMED`, `PAYMENT_REJECTED` dihapus; webhook handler dibatasi APPROVED + NEED_REVISION; acceptance checklist diupdate
+  - `module/epb-invoice/README.md` — **file baru**: overview M9b, boundaries, dependencies, key decisions
+  - `module/epb-invoice/requirements.md` — **file baru**: FR-EI-01 s/d FR-EI-08 dari BRD §3.4.9b
+  - `module/epb-invoice/specifications.md` — **file baru**: payment lifecycle (UNPAID→PENDING_REVIEW→PAYMENT_REJECT/PAID), DB schema (epb_payments + epb_payment_proofs), STS webhook (EPB_PENDING_REVIEW, EPB_PAYMENT_REJECT, EPB_PAID), upload endpoint, list/detail API, frontend routes
+  - `module/epb-invoice/user-stories.md` — **file baru**: US-EI-01 s/d US-EI-06 dengan acceptance criteria lengkap
+  - `implementation/replit-handoff/m9b-epb-invoice.md` — **file baru**: full Replit Agent handoff (9 steps + acceptance checklist)
+- **Logic / Decisions Made:**
+  - **Pemisahan M9 / M9b sesuai Swimlane V3:** M9 berakhir tepat setelah customer submit EPB Confirmation (first proof upload). Status `WAITING_PAYMENT_VERIFICATION` dihapus dari M9 — diganti dengan status terminal `EPB_CONFIRMATION_SUBMITTED` di M9. Siklus verifikasi (UNPAID → PENDING_REVIEW → PAYMENT_REJECT → PAID) sepenuhnya di M9b.
+  - **Kepemilikan tabel `epb_payments`:** Tabel dibuat oleh migrasi M9b, tetapi INSERT row pertama dilakukan oleh M9 Step 6 (EPB Confirmation Submit). Ini memungkinkan M9 dan M9b dikerjakan secara sequential tanpa circular dependency.
+  - **Webhook separation:** M9 webhook handler (`POST /api/webhooks/sts/nomination-status`) hanya menangani APPROVED dan NEED_REVISION. M9b punya webhook handler terpisah (`POST /api/webhooks/sts/epb-payment-status`) untuk EPB_PENDING_REVIEW, EPB_PAYMENT_REJECT, EPB_PAID.
+  - **Upload endpoint M9b:** Satu endpoint `POST /api/customer/epb-payments/:id/proof` melayani dua flow (Pay dari UNPAID, dan Revision Data dari PAYMENT_REJECT) — dibedakan oleh current status, bukan mode flag.
+  - **M8 tidak terdampak:** Requirements, specifications, user-stories, dan replit-handoff M8 tidak perlu diubah.
+- **Results / Next Steps:**
+  - Semua 4 layer pipeline (module → replit-handoff) kini sinkron dengan BRD v3.1 untuk M9 dan M9b.
+  - M9b siap dihandoff ke Replit Agent menggunakan `implementation/replit-handoff/m9b-epb-invoice.md` setelah M9 selesai.
+  - Urutan implementasi yang disarankan: M7 → M8 → M9 → M9b → M10.
+  - Tidak ada perubahan yang diperlukan di M8, M10, atau modul lainnya.
+
 ## 2026-05-06T13:00:00+07:00
 - **Task Performed:** Gap analysis Swimlane V3 vs BRD V3, lalu update BRD untuk sinkronisasi. BRD dinaikkan ke v3.1.
 - **Files Modified:**

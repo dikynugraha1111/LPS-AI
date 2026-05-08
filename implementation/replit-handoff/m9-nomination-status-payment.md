@@ -1,7 +1,12 @@
-# Replit Handoff — M9: Nomination Status & Payment
+# Replit Handoff — M9: Nomination Status & EPB Confirmation
+
+**Version:** 2.0 (revised per BRD v3.1 / Swimlane V3)
 
 ## Context
-Continuation of the LPS Customer Portal. **Module 9** handles everything after a nomination is submitted: receiving status updates from STS Platform, displaying EPB and schedule, customer revision flow, payment proof upload, and receiving payment verification results. Requires M7 (auth) and M8 (nominations) to be complete.
+
+Continuation of the LPS Customer Portal. **Module 9** handles everything after a nomination is submitted up to the moment the customer submits their first proof of payment (EPB Confirmation). After that Submit, data is handed off to **M9b (EPB & Invoice)** for the full payment verification cycle. Requires M7 (auth) and M8 (nominations) to be complete.
+
+> **Scope boundary:** This handoff does NOT implement WAITING_PAYMENT_VERIFICATION, PAYMENT_CONFIRMED, or PAYMENT_REJECTED states — those belong to M9b.
 
 ## Prerequisites
 - M7 complete: JWT auth, `customers` table.
@@ -18,7 +23,7 @@ Continuation of the LPS Customer Portal. **Module 9** handles everything after a
 
 ## Step 1: Database Migration
 
-File: `migrations/XXXXXX_create_nomination_status_payment.up.sql`
+File: `migrations/XXXXXX_create_nomination_status_m9.up.sql`
 
 ```sql
 -- Extend nominations table
@@ -26,32 +31,21 @@ ALTER TABLE nominations
     ADD COLUMN anchor_point             VARCHAR(50),
     ADD COLUMN etb                      TIMESTAMPTZ,
     ADD COLUMN estimated_duration_hours INTEGER,
-    ADD COLUMN revision_notes           TEXT;
+    ADD COLUMN revision_notes           TEXT,
+    ADD COLUMN sts_nomination_id        VARCHAR(100);
 
--- EPB data from STS Platform
+-- EPB data received from STS Platform (read-only display)
 CREATE TABLE nomination_epb (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nomination_id UUID NOT NULL REFERENCES nominations(id) ON DELETE CASCADE,
-    epb_number    VARCHAR(50) NOT NULL,
+    epb_number    VARCHAR(50) NOT NULL UNIQUE,
     amount        DECIMAL(20,2) NOT NULL,
     currency      VARCHAR(10) NOT NULL DEFAULT 'IDR',
     due_date      TIMESTAMPTZ,
     received_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Payment proofs uploaded by customer
-CREATE TABLE nomination_payment_proofs (
-    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    nomination_id    UUID NOT NULL REFERENCES nominations(id) ON DELETE CASCADE,
-    file_name        VARCHAR(255) NOT NULL,
-    file_url         TEXT NOT NULL,
-    file_size_bytes  INTEGER NOT NULL,
-    uploaded_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    sts_sent_at      TIMESTAMPTZ,
-    rejection_reason TEXT
-);
-
--- Immutable status change history
+-- Immutable status change history (used by M9 and M9b)
 CREATE TABLE nomination_status_history (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nomination_id UUID NOT NULL REFERENCES nominations(id),
@@ -62,12 +56,13 @@ CREATE TABLE nomination_status_history (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_epb_nomination_id          ON nomination_epb(nomination_id);
-CREATE INDEX idx_payment_proofs_nom_id      ON nomination_payment_proofs(nomination_id);
-CREATE INDEX idx_status_history_nom_id      ON nomination_status_history(nomination_id);
+CREATE INDEX idx_epb_nomination_id       ON nomination_epb(nomination_id);
+CREATE INDEX idx_status_history_nom_id   ON nomination_status_history(nomination_id);
 ```
 
-Extended nomination statuses (add to existing): `APPROVED`, `NEED_REVISION`, `WAITING_PAYMENT_VERIFICATION`, `PAYMENT_CONFIRMED`, `PAYMENT_REJECTED`
+Nomination statuses managed in M9: `PENDING`, `APPROVED`, `NEED_REVISION`, `EPB_CONFIRMATION_SUBMITTED`
+
+> `EPB_CONFIRMATION_SUBMITTED` is the terminal M9 status indicating the customer has submitted their first payment proof and data has been handed off to M9b. The full payment cycle (UNPAID, PENDING_REVIEW, PAYMENT_REJECT, PAID) is defined and managed in M9b.
 
 ---
 
@@ -94,7 +89,7 @@ Call this function every time nomination status changes.
 
 ---
 
-## Step 3: Backend — STS Webhook Handler
+## Step 3: Backend — STS Webhook Handler (APPROVED / NEED_REVISION only)
 
 File: `internal/webhook/sts_handler.go`
 
@@ -128,9 +123,9 @@ Route by `Event`:
 **Event: `APPROVED`**
 ```go
 type ApprovedData struct {
-    AnchorPoint             string    `json:"anchor_point"`
-    ETB                     time.Time `json:"etb"`
-    EstimatedDurationHours  int       `json:"estimated_duration_hours"`
+    AnchorPoint            string    `json:"anchor_point"`
+    ETB                    time.Time `json:"etb"`
+    EstimatedDurationHours int       `json:"estimated_duration_hours"`
     EPB struct {
         EPBNumber string    `json:"epb_number"`
         Amount    float64   `json:"amount"`
@@ -142,8 +137,8 @@ type ApprovedData struct {
 Actions:
 1. Update nomination: `status = APPROVED`, `anchor_point`, `etb`, `estimated_duration_hours`, `sts_nomination_id`.
 2. Insert into `nomination_epb`.
-3. Record status history.
-4. Send notification to customer (in-app + email).
+3. Record status history (triggered_by: "sts_webhook").
+4. Send in-app + email notification to customer.
 
 **Event: `NEED_REVISION`**
 ```go
@@ -156,25 +151,9 @@ Actions:
 2. Record status history.
 3. Send notification.
 
-**Event: `PAYMENT_CONFIRMED`**
-Actions:
-1. Update nomination: `status = PAYMENT_CONFIRMED`.
-2. Record status history.
-3. Send notification ("Pembayaran dikonfirmasi. Voyage dapat dimulai.").
-
-**Event: `PAYMENT_REJECTED`**
-```go
-type PaymentRejectedData struct {
-    RejectionReason string `json:"rejection_reason"`
-}
-```
-Actions:
-1. Update nomination: `status = PAYMENT_REJECTED`.
-2. Update latest `nomination_payment_proofs` row: set `rejection_reason`.
-3. Record status history.
-4. Send notification with rejection reason.
-
 Return 200 OK after all processing.
+
+> **Events NOT handled here:** `PAYMENT_CONFIRMED`, `PAYMENT_REJECTED` — these are routed to the M9b webhook handler.
 
 ---
 
@@ -183,15 +162,32 @@ Return 200 OK after all processing.
 File: `internal/nomination/status_handler.go`
 
 ### GET /api/customer/nominations/:id/status
-Returns full nomination status data including EPB (if APPROVED+), schedule, latest payment proof, and status history.
+
+Returns nomination status data including EPB (if APPROVED) and status history.
 
 Response:
 ```json
 {
-  "nomination": { ...all fields... },
-  "epb": { "epb_number": "", "amount": 0, "currency": "IDR", "due_date": "" } | null,
-  "payment_proof": { "file_name": "", "uploaded_at": "", "rejection_reason": "" } | null,
-  "status_history": [ { "from_status": "", "to_status": "", "triggered_by": "", "created_at": "" } ]
+  "nomination": {
+    "id": "uuid",
+    "nomination_number": "NOM-20260502-0001",
+    "vessel_name": "MV Sinar Laut",
+    "status": "APPROVED",
+    "anchor_point": "AP-3",
+    "etb": "2026-05-02T06:00:00Z",
+    "estimated_duration_hours": 36,
+    "revision_notes": null,
+    "submitted_at": "2026-05-01T10:00:00Z"
+  },
+  "epb": {
+    "epb_number": "EPB-2026-0042",
+    "amount": 15000000.00,
+    "currency": "IDR",
+    "due_date": "2026-04-30T23:59:59Z"
+  } | null,
+  "status_history": [
+    { "from_status": "SUBMITTED", "to_status": "PENDING", "triggered_by": "system", "created_at": "" }
+  ]
 }
 ```
 
@@ -202,130 +198,118 @@ Guard: nomination must belong to authenticated customer.
 ## Step 5: Backend — Revision Submit
 
 ### POST /api/customer/nominations/:id/revise
+
 Only allowed if `status = NEED_REVISION`.
 
-Request body: same as nomination update (all nomination fields + documents can be re-uploaded).
+Request body: same nomination fields + documents can be re-uploaded.
 
 Logic:
-1. Validate all fields (same as submit).
+1. Validate all fields (same rules as M8 submit).
 2. Update nomination fields.
 3. Set `status = SUBMITTED`, `submitted_at = now()`.
-4. Async: re-send to STS Platform with updated payload (same endpoint as M8 Step 5 but include `sts_nomination_id` as a reference).
+4. Async: re-send to STS Platform with updated payload (same M8 endpoint, include `sts_nomination_id` as reference).
 5. On STS success: set `status = PENDING`.
-6. Record status history.
+6. Record status history (triggered_by: "customer").
 
 ---
 
-## Step 6: Backend — Payment Proof Upload
+## Step 6: Backend — EPB Confirmation Submit (First Payment Proof)
 
-### POST /api/customer/nominations/:id/payment-proof
+### POST /api/customer/nominations/:id/epb-confirmation
+
 Only allowed if `status = APPROVED`.
 
-Multipart form: `file` field.
+Multipart form: `file` field + optional metadata fields (bank_name, reference_number, payment_date).
 
 Validation:
 - File type: PDF, JPG, PNG only (check MIME type with `http.DetectContentType`)
 - Max size: 5MB (5 × 1024 × 1024 bytes)
 - Nomination must belong to authenticated customer
 - Nomination status must be `APPROVED`
+- Idempotency guard: reject if status is already `EPB_CONFIRMATION_SUBMITTED`
 
 Logic:
-1. Save file to storage.
-2. Insert into `nomination_payment_proofs`.
-3. Update `nominations.status = WAITING_PAYMENT_VERIFICATION`.
+1. Save file to storage: `uploads/nominations/:nomination_id/epb-confirmation/`.
+2. Create a new `epb_payments` record in M9b schema (status = `UNPAID`, linked to `nomination_epb.epb_number`).
+
+   ```sql
+   -- Defined in M9b migration, but INSERT happens here:
+   INSERT INTO epb_payments (id, nomination_id, epb_id, file_name, file_url, file_size_bytes, bank_name, reference_number, payment_date, status)
+   VALUES (..., 'UNPAID');
+   ```
+
+3. Update `nominations.status = EPB_CONFIRMATION_SUBMITTED`.
 4. Record status history (triggered_by: "customer").
-5. Async: send proof to STS Platform (Step 7).
-6. Return 201 with file metadata.
+5. Return 201 with redirect hint: `{ "redirect_to": "/customer/epb-invoice" }`.
+
+> The `epb_payments` table is created by the M9b migration. M9 only inserts the first row. M9b handles all subsequent status transitions on that row.
 
 ---
 
-## Step 7: Backend — Send Payment Proof to STS
-
-File: `internal/sts/payment_client.go`
-
-```
-POST {STS_PLATFORM_BASE_URL}/api/nominations/{sts_nomination_id}/payment-proof
-Headers: Authorization: Bearer {STS_API_KEY}
-Body:
-{
-  "lps_nomination_id": "uuid",
-  "epb_number": "EPB-2026-0042",
-  "file_url": "https://...",
-  "file_name": "bukti_bayar.pdf",
-  "uploaded_at": "ISO-8601"
-}
-```
-
-Retry max 3× exponential backoff. On all retries fail: log error; status stays `WAITING_PAYMENT_VERIFICATION` (customer is NOT notified of the internal send failure — do not confuse with payment rejection).
-
----
-
-## Step 8: Frontend — Nomination Status Page
+## Step 7: Frontend — Nomination Status Page
 
 File: `src/pages/customer/NominationStatusPage.tsx`
 Route: `/customer/nominations/:id`
 
-Use TanStack React Query to fetch `/api/customer/nominations/:id/status`. Poll every 30 seconds while status is `PENDING` or `WAITING_PAYMENT_VERIFICATION`.
+Use TanStack React Query to fetch `/api/customer/nominations/:id/status`. Poll every 30 seconds while status is `PENDING`.
 
 **Status Banner (top of page, color-coded):**
+
 | Status | Color | Display Text |
 |--------|-------|-------------|
 | PENDING | Blue | "Menunggu proses di STS Platform" |
-| APPROVED | Green | "Nominasi Disetujui" |
+| APPROVED | Green | "Nominasi Disetujui — Silakan lengkapi Konfirmasi EPB" |
 | NEED_REVISION | Orange | "Perlu Revisi — [revision_notes]" |
-| WAITING_PAYMENT_VERIFICATION | Purple | "Menunggu Verifikasi Pembayaran" |
-| PAYMENT_CONFIRMED | Dark Green | "Pembayaran Dikonfirmasi — Voyage dapat dimulai" |
-| PAYMENT_REJECTED | Red | "Pembayaran Ditolak — [rejection_reason]" |
+| EPB_CONFIRMATION_SUBMITTED | Teal | "Konfirmasi EPB terkirim — Lihat status di menu EPB & Invoice" |
 | SUBMIT_FAILED | Red | "Gagal Mengirim ke STS Platform" with Retry button |
 
 **Sections (show/hide based on status):**
 
 *Nomination Details* — always visible: vessel name, ETA, cargo type, qty, charterer, barge count, documents list.
 
-*Schedule & EPB* — visible only when status is APPROVED or later:
-- Anchor Point, ETB (formatted), Estimated Duration
+*Schedule & EPB* — visible only when status is `APPROVED` or `EPB_CONFIRMATION_SUBMITTED`:
+- Anchor Point, ETB (formatted date-time), Estimated Duration
 - EPB Number, Amount (format as "Rp XX.XXX.XXX"), Due Date
 
-*Payment Proof Upload* — visible only when status is APPROVED:
+*EPB Confirmation Upload* — visible only when status is `APPROVED`:
 - File dropzone accepting PDF/JPG/PNG, max 5MB
-- Shows "Upload Bukti Pembayaran" button
-- After upload: shows uploaded file name + timestamp
+- Optional fields: Bank Name, Reference Number, Payment Date
+- "Submit Konfirmasi EPB" button
+- After successful submit: show success message and link to EPB & Invoice page
 
-*Payment Proof Re-upload* — visible only when status is PAYMENT_REJECTED:
-- Show rejection reason
-- File dropzone for re-upload
-
-*Revision Form Link* — visible only when status is NEED_REVISION:
+*Revision Form Link* — visible only when status is `NEED_REVISION`:
 - "Revisi Nominasi" button → navigate to `/customer/nominations/:id/revise`
 
 ---
 
-## Step 9: Frontend — Revision Form
+## Step 8: Frontend — Revision Form
 
 File: `src/pages/customer/NominationRevisionPage.tsx`
 Route: `/customer/nominations/:id/revise`
 
-Pre-fill form with existing nomination data. Same form as M8 NominationFormPage but in "revision" mode:
+Pre-fill form with existing nomination data. Same form as M8 NominationFormPage but in revision mode:
 - Show revision notes from STS at the top as a warning banner
 - All fields editable
 - Submit button: "Re-Submit Nominasi"
 - `POST /api/customer/nominations/:id/revise` on submit
+- On success: redirect to `/customer/nominations/:id`
 
 ---
 
 ## Acceptance Checklist
+
 - [ ] STS webhook endpoint validates HMAC signature (rejects invalid signatures with 401)
-- [ ] APPROVED webhook: nomination status updates to APPROVED, EPB and schedule stored and displayed
-- [ ] NEED_REVISION webhook: status updates, revision notes displayed, revision form accessible
-- [ ] PAYMENT_CONFIRMED webhook: status updates to PAYMENT_CONFIRMED
-- [ ] PAYMENT_REJECTED webhook: status updates, rejection reason displayed, re-upload available
+- [ ] `APPROVED` webhook: nomination status updates, EPB and schedule stored and displayed
+- [ ] `NEED_REVISION` webhook: status updates, revision notes displayed, revision form accessible
 - [ ] Status changes within 1 minute of STS webhook receipt
-- [ ] Customer receives in-app notification on every status change
-- [ ] EPB section only visible when status is APPROVED or later
-- [ ] Payment proof upload accepts PDF/JPG/PNG, rejects other types
+- [ ] Customer receives in-app + email notification on every status change
+- [ ] EPB section only visible when status is `APPROVED` or `EPB_CONFIRMATION_SUBMITTED`
+- [ ] EPB Confirmation upload accepts PDF/JPG/PNG, rejects other types with clear error
 - [ ] File > 5MB is rejected with clear error
-- [ ] After payment proof upload, status immediately changes to WAITING_PAYMENT_VERIFICATION
-- [ ] Payment proof is sent to STS Platform API
-- [ ] Revision form is only accessible when status is NEED_REVISION
-- [ ] Re-submission sets status back to PENDING
-- [ ] All status changes are recorded in nomination_status_history
+- [ ] After EPB Confirmation submit: `nominations.status` = `EPB_CONFIRMATION_SUBMITTED`
+- [ ] After EPB Confirmation submit: a new `epb_payments` row (status `UNPAID`) is created in M9b table
+- [ ] After EPB Confirmation submit: customer is redirected/linked to EPB & Invoice page (`/customer/epb-invoice`)
+- [ ] Duplicate EPB Confirmation submit is rejected (idempotency guard)
+- [ ] Revision form is only accessible when status is `NEED_REVISION`
+- [ ] Re-submission sets status back to `PENDING`
+- [ ] All status changes recorded in `nomination_status_history`
