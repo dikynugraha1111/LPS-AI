@@ -7,15 +7,19 @@
 ```
 DRAFT ──────────────────────────────────── (M8)
   └─► SUBMITTED ──► PENDING ─────────────── (M8 → M9)
-                       ├─► APPROVED ─────── (STS webhook)
-                       │       └─► [EPB Confirmation page]
-                       │               └─► Submit ──► handoff to M9b
+                       ├─► APPROVED ─────── (STS webhook → sistem otomatis buat epb_payments UNPAID)
+                       │       └─► [customer buka M9b, klik Pay, upload proof]
+                       │               └─► WAITING_PAYMENT_VERIFICATION ──► (STS verifies)
+                       │                           ├─► PAYMENT_REJECT ──► (customer re-upload)
+                       │                           └─► PAYMENT_CONFIRMED
                        └─► NEED_REVISION ──► (customer revises) ──► PENDING (re-submit)
 ```
 
-Statuses managed **within M9**: `PENDING`, `APPROVED`, `NEED_REVISION`
+Statuses managed **within M9** (on `nominations` table): `PENDING`, `APPROVED`, `NEED_REVISION`, `WAITING_PAYMENT_VERIFICATION`, `PAYMENT_CONFIRMED`
 
-Statuses that belong to **M9b** (not stored/tracked in M9): `UNPAID`, `PENDING_REVIEW`, `PAYMENT_REJECT`, `PAID`
+> Setelah customer upload proof di M9b, `nominations.status` ikut berubah menjadi `WAITING_PAYMENT_VERIFICATION`. Status ini sejajar dengan `epb_payments.status`. Tidak ada status `EPB_CONFIRMATION_SUBMITTED`.
+
+Statuses mirrored from **M9b** (`epb_payments` table): `UNPAID` (tidak ada padanannya di nominations — dibuat otomatis saat webhook APPROVED), `WAITING_PAYMENT_VERIFICATION`, `PAYMENT_REJECT`, `PAYMENT_CONFIRMED`
 
 ## 2. STS Platform Webhook — Inbound (FR-NP-01)
 
@@ -49,10 +53,11 @@ Statuses that belong to **M9b** (not stored/tracked in M9): `UNPAID`, `PENDING_R
 **Processing:**
 1. Verify HMAC signature → reject with 401 if invalid.
 2. Find nomination by `lps_nomination_id` → update status and store relevant data.
-3. Trigger in-app + email notification to customer (FR-NP-04).
-4. Return 200 OK immediately (process async if needed).
+3. For `APPROVED` event: otomatis buat row `epb_payments` di M9b schema dengan status `UNPAID` (linked ke `nomination_epb`). Ini yang memunculkan EPB di menu M9b.
+4. Trigger in-app + email notification to customer (FR-NP-04).
+5. Return 200 OK immediately (process async if needed).
 
-> Note: M9b handles its own inbound webhook events (`PAYMENT_CONFIRMED`, `PAYMENT_REJECTED`) on a separate endpoint.
+> Note: M9b handles its own inbound webhook events (`EPB_PAYMENT_REJECT`, `EPB_PAID`) on a separate endpoint.
 
 ## 3. View EPB & Schedule (FR-NP-02, FR-NP-03)
 
@@ -68,21 +73,17 @@ Statuses that belong to **M9b** (not stored/tracked in M9): `UNPAID`, `PENDING_R
 - On re-submit: same flow as M8 FR-NS-05 (send updated payload to STS API), include `sts_nomination_id` as reference.
 - Status transitions back to `PENDING` after re-submit.
 
-## 5. EPB Confirmation — First Payment Proof Upload (FR-NP-06, FR-NP-07)
+## 5. EPB Confirmation — View-Only Redirect to M9b (FR-NP-06, FR-NP-07)
 
-### Upload Constraints
-- Accepted formats: PDF, JPG, PNG
-- Max file size: 5MB per file
-- Visible only when `status = APPROVED`
+### Trigger
+- Ketika `nominations.status = APPROVED`, EPB section dan tombol "Bayar EPB" muncul.
+- Tombol "Bayar EPB" menavigasi customer ke halaman M9b EPB & Invoice (`/customer/epb-invoice/:epb_payment_id`) untuk melakukan upload proof.
 
-### Upload & Submit Flow
-1. Customer uploads file on EPB Confirmation page → store temporarily in LPS file storage.
-2. Customer fills any required data fields (reference number, bank, etc.).
-3. Customer clicks **Submit** → system creates a new `epb_payments` record in M9b schema.
-4. System sets nomination status to a terminal state within M9 (e.g., `EPB_CONFIRMED_SUBMITTED`) to indicate handoff to M9b has occurred.
-5. Customer is redirected to M9b EPB & Invoice page.
+> **Catatan desain:** Upload proof terjadi di M9b, bukan di M9. M9 hanya menampilkan EPB detail dan menyediakan link ke M9b. Ketika customer upload proof di M9b, `nominations.status` ikut diupdate ke `WAITING_PAYMENT_VERIFICATION` oleh M9b backend.
 
-> **Important:** After Submit, M9 does NOT track WAITING_PAYMENT_VERIFICATION or payment verification results. Those states live entirely in M9b.
+### Setelah customer upload proof di M9b
+- `nominations.status` berubah dari `APPROVED` → `WAITING_PAYMENT_VERIFICATION`.
+- EPB Confirmation section di M9 diganti dengan info banner: "Menunggu Verifikasi Pembayaran — lihat status di menu EPB & Invoice."
 
 ## 6. Database Schema (M9 additions)
 
@@ -128,8 +129,9 @@ CREATE INDEX idx_status_hist_nom_id    ON nomination_status_history(nomination_i
 |--------|------|-------------|------|
 | GET | /api/customer/nominations/:id/status | Get current status + EPB + schedule | Customer JWT |
 | POST | /api/customer/nominations/:id/revise | Submit revision data | Customer JWT |
-| POST | /api/customer/nominations/:id/epb-confirmation | Upload first proof of payment & submit EPB Confirmation | Customer JWT |
 | POST | /api/webhooks/sts/nomination-status | Receive STS status webhook (APPROVED / NEED_REVISION) | HMAC |
+
+> Tidak ada endpoint EPB Confirmation upload di M9. Upload proof terjadi di M9b melalui `POST /api/customer/epb-payments/:id/proof`.
 
 ## 8. Frontend Routes
 

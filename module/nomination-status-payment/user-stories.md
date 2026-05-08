@@ -10,7 +10,8 @@
 **Acceptance Criteria:**
 - [ ] Nomination detail page shows current status with a clear label
 - [ ] Status `PENDING` displays as "Menunggu proses di STS Platform"
-- [ ] Status `APPROVED` displays as "Nominasi Disetujui" with schedule and EPB details visible
+- [ ] Status `APPROVED` displays as "Nominasi Disetujui" dengan detail EPB dan tombol "Bayar EPB" yang mengarah ke M9b
+- [ ] Status `WAITING_PAYMENT_VERIFICATION` displays as "Menunggu Verifikasi Pembayaran" dengan info banner dan link ke EPB & Invoice
 - [ ] Status `NEED_REVISION` displays as "Perlu Revisi" with revision notes from STS
 - [ ] Status updates within 1 minute of STS sending the webhook
 
@@ -20,10 +21,11 @@
 **So that** I know how much to pay and when my vessel will be serviced.
 
 **Acceptance Criteria:**
-- [ ] EPB section is only visible when status is `APPROVED`
+- [ ] EPB section is visible when status is `APPROVED` or `WAITING_PAYMENT_VERIFICATION`
 - [ ] EPB shows: EPB Number, Total Amount (formatted as IDR), Due Date
 - [ ] Schedule shows: Anchor Point, ETB (formatted date-time), Estimated Duration
 - [ ] All EPB and schedule data are read-only (sourced from STS Platform)
+- [ ] Tombol "Bayar EPB" muncul saat status `APPROVED`, mengarah ke halaman M9b EPB & Invoice
 
 ## US-NP-03: Revise Nomination on Need Revision
 **As a** Customer,
@@ -38,15 +40,13 @@
 - [ ] On re-submit, status returns to `PENDING` and a new submission is sent to STS
 - [ ] Re-submitted nomination cannot be edited again until next STS response
 
-## US-NP-04: Submit EPB Confirmation (First Payment Proof)
+## US-NP-04: Navigate to EPB Payment Page
 **As a** Customer,
-**I want to** upload my payment proof and submit EPB Confirmation after receiving the EPB,
-**So that** my payment data is recorded and forwarded for verification in the EPB & Invoice menu.
+**I want to** melihat EPB saya dan diarahkan ke halaman pembayaran setelah nominasi disetujui,
+**So that** saya dapat dengan mudah melakukan pembayaran EPB melalui menu EPB & Invoice.
 
 **Acceptance Criteria:**
-- [ ] EPB Confirmation upload section is only visible when status is `APPROVED`
-- [ ] Upload accepts PDF, JPG, PNG; rejects other formats with a clear error message
-- [ ] File larger than 5MB shows error: "Ukuran file maksimal 5MB"
-- [ ] After successful Submit, customer is redirected to the EPB & Invoice page (M9b)
-- [ ] EPB Confirmation Submit button is disabled after first submission to prevent duplicate
-- [ ] Uploaded file name and upload timestamp are displayed before Submit
+- [ ] Saat status `APPROVED`, tombol "Bayar EPB" muncul di bawah detail EPB
+- [ ] Klik "Bayar EPB" → navigasi ke halaman M9b EPB & Invoice (`/customer/epb-invoice`)
+- [ ] Saat status `WAITING_PAYMENT_VERIFICATION`, tombol "Bayar EPB" diganti dengan info banner: "Menunggu Verifikasi Pembayaran" + link ke EPB & Invoice
+- [ ] Customer tidak dapat melakukan upload proof dari halaman M9 — upload dilakukan di M9b

@@ -33,4 +33,4 @@ None — this is a terminal read-only module.
 - AIS vessel position is only shown for voyages with status `PAYMENT_CONFIRMED` (voyage started).
 - Weather data shown to customers is the same data as the operator view but limited to current conditions and the last 24h of alerts.
 - Customer sees only their own nominations and voyages — no cross-customer data.
-- **Status scope (BRD v3.1):** M10 hanya membaca status di tabel `nominations`. Status payment (UNPAID, PENDING_REVIEW, PAYMENT_REJECT, PAID) adalah milik tabel `epb_payments` (M9b) — tidak tampil di daftar nominasi M10. Nominasi berstatus `EPB_CONFIRMATION_SUBMITTED` ditampilkan dengan label "Konfirmasi EPB Terkirim" dan shortcut link ke halaman EPB & Invoice M9b.
+- **Status scope (BRD v3.1):** M10 membaca `nominations.status` yang mencerminkan state pembayaran secara paralel: `APPROVED` (belum bayar), `WAITING_PAYMENT_VERIFICATION` (sudah upload proof), `PAYMENT_CONFIRMED` (lunas). Detail payment (proof history, rejection reason) ada di `epb_payments` (M9b).

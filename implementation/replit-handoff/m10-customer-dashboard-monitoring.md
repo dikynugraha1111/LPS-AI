@@ -63,24 +63,25 @@ Returns a single aggregated response to minimize frontend round-trips:
 ```
 
 **Query logic:**
-- `active_nominations`: nominations WHERE `customer_id = :customer_id` AND `status NOT IN ('DRAFT', 'PAYMENT_CONFIRMED', 'EPB_CONFIRMATION_SUBMITTED', 'SUBMIT_FAILED')` ORDER BY `updated_at DESC` LIMIT 10.
+- `active_nominations`: nominations WHERE `customer_id = :customer_id` AND `status NOT IN ('DRAFT', 'PAYMENT_CONFIRMED', 'SUBMIT_FAILED')` ORDER BY `updated_at DESC` LIMIT 10.
 - `active_voyages`: nominations WHERE `customer_id = :customer_id` AND `status = 'PAYMENT_CONFIRMED'`. For each, fetch latest AIS position from internal AIS API.
 - `weather`: fetch from LPS weather cache (see Step 3).
 
 **Status label mapping (Go):**
 ```go
 // Status pada tabel nominations (BRD v3.1):
-// WAITING_PAYMENT_VERIFICATION dan PAYMENT_REJECTED sudah dihapus dari nominations.
-// Siklus payment (UNPAID/PENDING_REVIEW/PAYMENT_REJECT/PAID) ada di tabel epb_payments (M9b).
+// APPROVED = nominasi disetujui, EPB tersedia, belum ada bukti pembayaran.
+// WAITING_PAYMENT_VERIFICATION = customer sudah upload proof di M9b, menunggu keputusan STS.
+// Detail payment (proof, rejection reason) ada di tabel epb_payments (M9b).
 var statusLabels = map[string]string{
-    "DRAFT":                       "Draft",
-    "SUBMITTED":                   "Submitted",
-    "PENDING":                     "Menunggu proses di STS Platform",
-    "APPROVED":                    "Nominasi Disetujui",
-    "NEED_REVISION":               "Perlu Revisi",
-    "EPB_CONFIRMATION_SUBMITTED":  "Konfirmasi EPB Terkirim",
-    "PAYMENT_CONFIRMED":           "Pembayaran Dikonfirmasi",
-    "SUBMIT_FAILED":               "Gagal Dikirim",
+    "DRAFT":                         "Draft",
+    "SUBMITTED":                     "Submitted",
+    "PENDING":                       "Menunggu proses di STS Platform",
+    "APPROVED":                      "Nominasi Disetujui",
+    "NEED_REVISION":                 "Perlu Revisi",
+    "WAITING_PAYMENT_VERIFICATION":  "Menunggu Verifikasi Pembayaran",
+    "PAYMENT_CONFIRMED":             "Pembayaran Dikonfirmasi",
+    "SUBMIT_FAILED":                 "Gagal Dikirim",
 }
 ```
 
@@ -92,12 +93,12 @@ var statusLabels = map[string]string{
 Auth: Customer JWT. Returns all nominations for authenticated customer.
 
 Query params:
-- `?filter=active` → status NOT IN ('DRAFT', 'PAYMENT_CONFIRMED', 'EPB_CONFIRMATION_SUBMITTED', 'SUBMIT_FAILED')
+- `?filter=active` → status NOT IN ('DRAFT', 'PAYMENT_CONFIRMED', 'SUBMIT_FAILED')
 - `?filter=draft` → status = 'DRAFT'
 - `?filter=completed` → status = 'PAYMENT_CONFIRMED'
 - (no filter) → all
 
-> `EPB_CONFIRMATION_SUBMITTED` dikecualikan dari filter `active` karena aksi selanjutnya ada di menu EPB & Invoice (M9b), bukan di halaman nominasi.
+> Nominasi dengan status `APPROVED` yang sudah submit EPB Confirmation tetap tampil di filter `active`. Detail payment tersedia di menu EPB & Invoice (M9b).
 
 Response: array of nomination summaries (id, nomination_number, vessel_name, eta, status, status_label, created_at).
 Order: `created_at DESC`.
@@ -235,7 +236,7 @@ Action column: "Lihat Detail" → `/customer/nominations/:id`
 - SUBMITTED / PENDING → blue
 - APPROVED → green
 - NEED_REVISION → orange
-- EPB_CONFIRMATION_SUBMITTED → teal (label: "Konfirmasi EPB Terkirim" + link ke `/customer/epb-invoice`)
+- WAITING_PAYMENT_VERIFICATION → yellow (label: "Menunggu Verifikasi Pembayaran")
 - PAYMENT_CONFIRMED → dark green
 - SUBMIT_FAILED → red
 

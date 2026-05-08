@@ -3,37 +3,39 @@
 ## 1. Payment Status Lifecycle
 
 ```
-[M9 EPB Confirmation Submit]
+[M9 webhook APPROVED handler — sistem buat row otomatis]
         │
         ▼
-    UNPAID ──► Click Pay ──► Upload + Submit
-        │                           │
-        │                           ▼
-        │                    PENDING_REVIEW ──► STS verifies
-        │                           │
-        │               ┌───────────┴────────────┐
-        │               ▼                        ▼
-        │        PAYMENT_REJECT              PAID
-        │         (click Revision Data)    (view-only)
-        │               │
-        │               ▼
-        │       Upload + Re-Submit
-        │               │
-        └───────────────┘ (loop back to PENDING_REVIEW)
+    UNPAID ──► customer klik "Pay" ──► upload proof + submit
+                                               │
+                                               ▼
+                                  WAITING_PAYMENT_VERIFICATION ──► STS verifies
+                                               │
+                                   ┌───────────┴────────────┐
+                                   ▼                        ▼
+                            PAYMENT_REJECT                PAID
+                          (klik Revision Data)          (view-only)
+                                   │
+                                   ▼
+                           Upload + Re-Submit
+                                   │
+                                   └──► WAITING_PAYMENT_VERIFICATION (loop)
 ```
 
-Statuses: `UNPAID`, `PENDING_REVIEW`, `PAYMENT_REJECT`, `PAID`
+Statuses: `UNPAID`, `WAITING_PAYMENT_VERIFICATION`, `PAYMENT_REJECT`, `PAID`
+
+> Row `epb_payments` dibuat oleh M9 webhook handler (event `APPROVED`) dengan status `UNPAID`. Customer melakukan upload proof di M9b (bukan di M9). Setelah upload, `epb_payments.status` dan `nominations.status` sama-sama diset ke `WAITING_PAYMENT_VERIFICATION`.
 
 ## 2. Database Schema
 
 ```sql
--- Core payment table (owned by M9b; first row inserted by M9 Step 6)
+-- Core payment table (owned by M9b; first row inserted by M9 webhook handler saat event APPROVED)
 CREATE TABLE epb_payments (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nomination_id     UUID NOT NULL REFERENCES nominations(id) ON DELETE CASCADE,
     epb_id            UUID NOT NULL REFERENCES nomination_epb(id) ON DELETE CASCADE,
-    status            VARCHAR(30) NOT NULL DEFAULT 'UNPAID',
-    -- 'UNPAID' | 'PENDING_REVIEW' | 'PAYMENT_REJECT' | 'PAID'
+    status            VARCHAR(40) NOT NULL DEFAULT 'UNPAID',
+    -- 'UNPAID' | 'WAITING_PAYMENT_VERIFICATION' | 'PAYMENT_REJECT' | 'PAID'
     rejection_reason  TEXT,
     confirmed_at      TIMESTAMPTZ,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -70,7 +72,7 @@ CREATE INDEX idx_epb_proofs_payment_id      ON epb_payment_proofs(epb_payment_id
 {
   "lps_nomination_id": "uuid",
   "epb_number": "EPB-2026-0042",
-  "event": "EPB_PENDING_REVIEW | EPB_PAYMENT_REJECT | EPB_PAID",
+  "event": "EPB_PAYMENT_REJECT | EPB_PAID",
   "timestamp": "ISO-8601",
   "data": {
     // For EPB_PAYMENT_REJECT:
@@ -83,28 +85,27 @@ CREATE INDEX idx_epb_proofs_payment_id      ON epb_payment_proofs(epb_payment_id
 
 **Processing per event:**
 
-`EPB_PENDING_REVIEW`:
-1. Find `epb_payments` by `nomination_id` + `epb_number`.
-2. Update `status = PENDING_REVIEW`.
-3. Send in-app + email notification to customer.
-
 `EPB_PAYMENT_REJECT`:
-1. Update `epb_payments.status = PAYMENT_REJECT`, store `rejection_reason`.
-2. Send notification with rejection reason.
+1. Find `epb_payments` by `nomination_id` + `epb_number`.
+2. Update `status = PAYMENT_REJECT`, store `rejection_reason`.
+3. Send notification with rejection reason.
 
 `EPB_PAID`:
-1. Update `epb_payments.status = PAID`, set `confirmed_at`.
-2. Send notification: "Pembayaran dikonfirmasi. Voyage dapat dimulai."
+1. Find `epb_payments` by `nomination_id` + `epb_number`.
+2. Update `epb_payments.status = PAID`, set `confirmed_at`.
+3. Send notification: "Pembayaran dikonfirmasi. Voyage dapat dimulai."
+
+> `EPB_PENDING_REVIEW` webhook is not needed — M9 sets status directly to `WAITING_PAYMENT_VERIFICATION` when the first proof is uploaded.
 
 Return 200 OK immediately.
 
-## 4. Upload Payment Proof (FR-EI-03, FR-EI-05, FR-EI-08)
+## 4. Upload Payment Proof (FR-EI-03, FR-EI-04, FR-EI-07)
 
 ### Endpoint: POST /api/customer/epb-payments/:epb_payment_id/proof
 
 **Auth:** Customer JWT. Guard: `epb_payment` must belong to authenticated customer.
 
-**Allowed statuses:** `UNPAID` (initial Pay flow) or `PAYMENT_REJECT` (Revision Data flow).
+**Allowed statuses:** `UNPAID` (Pay flow — pertama kali) atau `PAYMENT_REJECT` (Revision Data flow). Satu endpoint untuk kedua flow, dibedakan oleh status saat ini.
 
 Multipart form fields:
 - `file` — required, PDF/JPG/PNG, max 5MB
@@ -116,11 +117,12 @@ Logic:
 1. Validate file type (MIME check) and size.
 2. Save file to `uploads/epb-payments/:epb_payment_id/`.
 3. Insert row into `epb_payment_proofs`.
-4. Update `epb_payments.status = PENDING_REVIEW`, `updated_at = now()`.
-5. Async: send to STS Platform (Step 5).
-6. Return 201.
+4. Update `epb_payments.status = WAITING_PAYMENT_VERIFICATION`, `rejection_reason = null` (jika dari PAYMENT_REJECT), `updated_at = now()`.
+5. Update `nominations.status = WAITING_PAYMENT_VERIFICATION` (secara bersamaan, dalam satu transaksi DB).
+6. Async: send proof to STS Platform (Step 5).
+7. Return 201.
 
-## 5. Send Payment Proof to STS Platform (FR-EI-08)
+## 5. Send Payment Proof to STS Platform (FR-EI-07)
 
 ```
 POST {STS_PLATFORM_BASE_URL}/api/epb/{epb_number}/payment-proof
@@ -138,7 +140,7 @@ Body:
 }
 ```
 
-Retry max 3× exponential backoff. On all retries fail: log error; `status` stays `PENDING_REVIEW` (internal STS send failure is NOT shown to customer as payment rejection).
+Retry max 3× exponential backoff. On all retries fail: log error; `epb_payments.status` dan `nominations.status` tetap `WAITING_PAYMENT_VERIFICATION` (internal STS send failure is NOT shown to customer as payment rejection).
 
 ## 6. List EPB & Invoice
 
@@ -157,7 +159,7 @@ Response:
     "amount": 15000000.00,
     "currency": "IDR",
     "due_date": "2026-04-30T23:59:59Z",
-    "status": "PENDING_REVIEW",
+    "status": "WAITING_PAYMENT_VERIFICATION",
     "rejection_reason": null,
     "confirmed_at": null,
     "latest_proof": {
@@ -179,8 +181,8 @@ Returns full detail of a single EPB payment including all proof upload attempts.
 |--------|------|-------------|------|
 | GET | /api/customer/epb-payments | List all EPBs for customer | Customer JWT |
 | GET | /api/customer/epb-payments/:id | EPB detail + proof history | Customer JWT |
-| POST | /api/customer/epb-payments/:id/proof | Upload payment proof (Pay or Revision Data) | Customer JWT |
-| POST | /api/webhooks/sts/epb-payment-status | Receive STS payment status webhook | HMAC |
+| POST | /api/customer/epb-payments/:id/proof | Upload payment proof (Pay flow: UNPAID, atau Revision Data: PAYMENT_REJECT) | Customer JWT |
+| POST | /api/webhooks/sts/epb-payment-status | Receive STS payment status webhook (EPB_PAYMENT_REJECT, EPB_PAID) | HMAC |
 
 ## 8. Frontend Routes
 

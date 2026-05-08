@@ -1,4 +1,78 @@
 
+## 2026-05-09T12:00:00+07:00
+- **Task Performed:** Gap analysis antara BRD v3.1 dan seluruh perubahan arsitektur yang telah dilakukan di session sebelumnya (08–09 Mei 2026). Update BRD ke versi 3.2 untuk mensinkronkan 6 area yang tidak konsisten.
+- **Files Modified:**
+  - `document/BRD-LPS-V3-Analysis.md` — versi naik ke 3.2, 7 lokasi diupdate:
+    1. Change Log: tambah entri #15–#20 yang mendokumentasikan semua perubahan arsitektur v3.2
+    2. Section 2.1 M9 (Cakupan): hapus EPB Confirmation upload dari scope M9; tambah "otomatis buat row UNPAID saat APPROVED" dan "tombol Bayar EPB → navigasi ke M9b"; lifecycle tambah WAITING_PAYMENT_VERIFICATION
+    3. Section 2.1 M9b (4 Status Payment): ganti "Pending Review" → "Waiting Payment Verification"; tambah catatan bahwa record UNPAID dibuat otomatis saat APPROVED; perjelas flow per status
+    4. Section 3.2 End-to-End Flow Phase 1 step 6–9: revisi sesuai arsitektur baru (otomatis buat UNPAID, tombol Bayar EPB, upload di M9b, status WAITING_PAYMENT_VERIFICATION)
+    5. Section 3.4.9 FR-NP-06, FR-NP-07: direvisi total + tambah FR-NP-08 (update nominations.status paralel)
+    6. Section 3.4.9b FR-EI-01, FR-EI-04, FR-EI-07: update status labels + tambah FR-EI-09 (update nominations.status dalam transaksi)
+    7. Appendix A.2: ganti "Pending Review" → "Waiting Payment Verification" + tambah catatan auto-create UNPAID
+- **Logic / Decisions Made:**
+  - **Gap 1 — Section 2.1 M9:** BRD masih menyebut customer upload proof di M9. Faktanya upload dilakukan di M9b. Fix: scope M9 diubah ke "tampilkan EPB + navigasi ke M9b".
+  - **Gap 2 — Section 2.1 M9b:** Istilah "Pending Review" sudah tidak digunakan (diganti WAITING_PAYMENT_VERIFICATION). Fix: seluruh referensi diupdate.
+  - **Gap 3 — Section 3.2 step 7–8:** Flow masih menggambarkan upload di M9 lalu pindah ke M9b. Fix: step 6–9 di-rewrite sesuai arsitektur baru.
+  - **Gap 4 — FR-NP-06, FR-NP-07:** FR lama masih memerintahkan upload di M9. Fix: FR-NP-06 diubah jadi "tombol navigasi ke M9b"; FR-NP-07 diubah jadi "otomatis buat record UNPAID saat APPROVED"; tambah FR-NP-08 baru.
+  - **Gap 5 — FR-EI-04 & FR-EI-07:** Masih pakai "Pending Review". Fix: update ke "Waiting Payment Verification" + klarifikasi webhook hanya PAYMENT_REJECT dan PAID. Tambah FR-EI-09.
+  - **Gap 6 — Appendix A.2:** Status list masih "Pending Review". Fix: diupdate ke "Waiting Payment Verification".
+  - **Tidak ada gap di:** Section 1 (Executive Summary), Section 3.3 (Role & Access), FR lain di 3.4.1–3.4.8 dan 3.4.10–3.4.12, Section 3.5 (NFR), Section 4 (Constraints), Section 5 (Risk), Section 6 (Acceptance Criteria), Appendix A.1 & A.3.
+- **Results / Next Steps:**
+  - BRD v3.2 kini sepenuhnya sinkron dengan arsitektur implementasi M9/M9b/M10.
+  - Seluruh pipeline (BRD → module → replit-handoff) konsisten.
+  - Pipeline siap dieksekusi ke Replit Agent: M7 → M8 → M9 → M9b → M10.
+
+## 2026-05-09T00:00:00+07:00
+- **Task Performed:** Revisi arsitektur status M9/M9b: kembalikan status `UNPAID` di M9b, tambah `WAITING_PAYMENT_VERIFICATION` di tabel `nominations`, pindah upload proof dari M9 ke M9b, buat `epb_payments UNPAID` otomatis saat webhook APPROVED.
+- **Files Modified:**
+  - `module/nomination-status-payment/README.md` — Key Decisions diupdate: nominations lifecycle baru, epb_payments dibuat saat APPROVED, upload di M9b
+  - `module/nomination-status-payment/specifications.md` — lifecycle diagram baru, webhook APPROVED tambah INSERT epb_payments UNPAID, Section 5 diubah jadi redirect ke M9b (hapus upload flow), endpoint list diupdate
+  - `module/nomination-status-payment/user-stories.md` — US-NP-01 update status labels, US-NP-02 tambah tombol Bayar EPB, US-NP-04 diubah ke "Navigate to EPB Payment Page"
+  - `module/epb-invoice/README.md` — Overview diupdate, In Scope kembalikan Unpaid flow, Key Decisions diupdate (epb_payments dibuat saat APPROVED, upload di M9b, nominations.status diupdate paralel)
+  - `module/epb-invoice/requirements.md` — FR-EI-01 s/d FR-EI-09: kembalikan FR-EI-03 (Unpaid Pay flow), tambah FR-EI-09 (update nominations.status paralel)
+  - `module/epb-invoice/specifications.md` — lifecycle diagram dikembalikan dengan UNPAID, DB schema default = UNPAID, upload endpoint scope = UNPAID atau PAYMENT_REJECT, logic tambah update nominations.status dalam satu transaksi
+  - `module/epb-invoice/user-stories.md` — kembalikan US-EI-03 (Pay Unpaid EPB), US-EI-04 (Monitor Waiting), renumber US-EI-05 s/d US-EI-06
+  - `module/customer-dashboard-monitoring/README.md` — Key Decision diupdate: nominations.status sekarang juga WAITING_PAYMENT_VERIFICATION
+  - `module/customer-dashboard-monitoring/specifications.md` — status list tambah WAITING_PAYMENT_VERIFICATION, Active filter note diupdate
+  - `implementation/replit-handoff/m9-nomination-status-payment.md` — Step 1 status list update, Step 3 webhook APPROVED tambah INSERT epb_payments UNPAID, Step 6 diubah jadi "Tombol Bayar EPB" (hapus upload backend), Step 7 status banner tambah WAITING_PAYMENT_VERIFICATION, acceptance checklist diupdate
+  - `implementation/replit-handoff/m9b-epb-invoice.md` — Prerequisites update, context update, Step 1 DB schema default UNPAID, Step 2 model default UNPAID, Step 5 kembalikan untuk UNPAID+PAYMENT_REJECT + tambah update nominations.status dalam transaksi, Step 7 kembalikan "Pay" button, Step 8 kembalikan Pay action section + upload modal shared, acceptance checklist diupdate
+  - `implementation/replit-handoff/m10-customer-dashboard-monitoring.md` — statusLabels map tambah WAITING_PAYMENT_VERIFICATION, status badge list tambah WAITING_PAYMENT_VERIFICATION (yellow)
+- **Logic / Decisions Made:**
+  - **Arsitektur baru:** `epb_payments` tetap punya `UNPAID` sebagai status awal — dibuat otomatis oleh M9 webhook handler saat event APPROVED diterima, tanpa aksi customer. Ini analog dengan `nominations.status = APPROVED` yang juga dibuat tanpa aksi customer.
+  - **Upload proof sepenuhnya di M9b:** M9 tidak punya endpoint upload. M9 hanya menampilkan EPB detail dan tombol "Bayar EPB" yang mengarah ke M9b. Ini konsisten dengan arsitektur M9b sebagai payment management module.
+  - **nominations.status dan epb_payments.status bergerak paralel:** Setelah customer upload proof di M9b, M9b backend mengupdate kedua tabel dalam satu transaksi DB. Ini memungkinkan M10 menampilkan status `WAITING_PAYMENT_VERIFICATION` di daftar nominasi tanpa perlu join ke `epb_payments`.
+  - **Satu upload endpoint untuk dua flow:** `POST /api/customer/epb-payments/:id/proof` melayani UNPAID (Pay) dan PAYMENT_REJECT (Revision Data), dibedakan oleh current status saja.
+- **Results / Next Steps:**
+  - Semua 4 layer pipeline (module → replit-handoff) untuk M9, M9b, M10 kini sinkron dengan arsitektur baru.
+  - Urutan implementasi: M7 → M8 → M9 → M9b → M10.
+
+## 2026-05-08T00:00:00+07:00
+- **Task Performed:** Hapus status `EPB_CONFIRMATION_SUBMITTED` dari M9 dan status `UNPAID` dari M9b. Menyederhanakan flow payment: setelah customer submit EPB Confirmation di M9, status nominasi tetap `APPROVED` dan `epb_payments` row langsung dibuat dengan status `WAITING_PAYMENT_VERIFICATION`.
+- **Files Modified:**
+  - `module/nomination-status-payment/README.md` — Key Decisions diupdate: hapus EPB_CONFIRMATION_SUBMITTED, tambah penjelasan nominations tetap APPROVED, epb_payments langsung WAITING_PAYMENT_VERIFICATION
+  - `module/nomination-status-payment/specifications.md` — lifecycle diagram diupdate, status list direvisi, upload & submit flow Step 3-4 diubah, note tentang tidak ada EPB_CONFIRMATION_SUBMITTED/UNPAID ditambahkan
+  - `module/nomination-status-payment/user-stories.md` — US-NP-01 tambah AC untuk APPROVED setelah proof submitted, US-NP-02 revisi, US-NP-04 acceptance criteria diupdate seluruhnya
+  - `module/epb-invoice/README.md` — Overview diupdate, In Scope direvisi (hapus Unpaid flow), Key Decisions diupdate (hapus UNPAID, hapus EPB_PENDING_REVIEW webhook, perjelas upload endpoint hanya untuk PAYMENT_REJECT), Dependencies diupdate
+  - `module/epb-invoice/requirements.md` — FR-EI-01 s/d FR-EI-08 direvisi: hapus FR-EI-03 (Unpaid Pay flow), renumber, update status labels ke WAITING_PAYMENT_VERIFICATION
+  - `module/epb-invoice/specifications.md` — lifecycle diagram diubah total (hapus UNPAID), DB schema default diubah ke WAITING_PAYMENT_VERIFICATION, webhook hapus EPB_PENDING_REVIEW, upload endpoint scope diubah ke PAYMENT_REJECT only, status di retry comment diupdate
+  - `module/epb-invoice/user-stories.md` — US-EI-03 diganti (Pay flow → Waiting Verification view-only), US-EI-04 s/d US-EI-06 direnumber ke US-EI-04 s/d US-EI-05
+  - `module/customer-dashboard-monitoring/README.md` — Key Decision status scope diupdate: hapus EPB_CONFIRMATION_SUBMITTED, tambah klarifikasi APPROVED tetap setelah submit
+  - `module/customer-dashboard-monitoring/specifications.md` — status list di §2 hapus EPB_CONFIRMATION_SUBMITTED, "Active" filter note diupdate
+  - `implementation/replit-handoff/m9-nomination-status-payment.md` — Step 1 status list diupdate, Step 6 logic diubah total (hapus EPB_CONFIRMATION_SUBMITTED, tambah WAITING_PAYMENT_VERIFICATION, tambah epb_payment_proofs insert, tambah note jangan ubah nominations.status), Step 7 status banner table diupdate, acceptance checklist diupdate
+  - `implementation/replit-handoff/m9b-epb-invoice.md` — Prerequisites diupdate, Step 1 DB schema default diubah, Step 2 model default diubah, Step 3 hapus EPB_PENDING_REVIEW handler + tambah note, Step 5 judul + validasi diubah (PAYMENT_REJECT only), Step 6 retry note diupdate, Step 7 layout hapus "Pay" button + update status badges, Step 8 tambah Waiting Verification info box + hapus Pay action, upload modal diubah jadi Revision Data only, acceptance checklist diupdate
+  - `implementation/replit-handoff/m10-customer-dashboard-monitoring.md` — query exclude list hapus EPB_CONFIRMATION_SUBMITTED, statusLabels map hapus EPB_CONFIRMATION_SUBMITTED, filter active note diupdate, status badge list hapus EPB_CONFIRMATION_SUBMITTED
+- **Logic / Decisions Made:**
+  - **Keputusan utama:** `EPB_CONFIRMATION_SUBMITTED` dan `UNPAID` adalah dua nama berbeda untuk state yang sama (customer sudah upload proof, menunggu verifikasi Finance). Digabung menjadi satu status: `WAITING_PAYMENT_VERIFICATION` yang langsung di-set ketika M9 Step 6 dijalankan.
+  - **Status nominasi tidak berubah:** Setelah EPB Confirmation submit, `nominations.status` tetap `APPROVED`. Tracking payment sepenuhnya delegasi ke `epb_payments`.
+  - **M9b tidak punya "initial upload" flow:** Tombol "Pay" di M9b dihapus. Entry point selalu dari M9. M9b hanya mengelola re-upload ketika `PAYMENT_REJECT`.
+  - **EPB_PENDING_REVIEW webhook dihapus:** Tidak dibutuhkan karena LPS sendiri yang men-set `WAITING_PAYMENT_VERIFICATION` saat proof di-upload — tidak perlu konfirmasi dari STS.
+  - **Idempotency guard M9 diubah:** Bukan cek `status = EPB_CONFIRMATION_SUBMITTED` lagi, melainkan cek apakah row `epb_payments` sudah ada untuk nomination EPB tersebut.
+- **Results / Next Steps:**
+  - Semua 4 layer pipeline (module → replit-handoff) untuk M9, M9b, dan M10 kini sinkron dengan keputusan baru.
+  - Flow customer lebih sederhana: Upload proof di M9 → langsung masuk WAITING_PAYMENT_VERIFICATION di M9b → tunggu STS → selesai (PAID) atau upload ulang (PAYMENT_REJECT).
+  - Pipeline siap dihandoff ke Replit Agent: M7 → M8 → M9 → M9b → M10.
+
 ## 2026-05-07T01:00:00+07:00
 - **Task Performed:** Analisis dampak perubahan M9/M9b terhadap M10 dan sinkronisasi yang diperlukan.
 - **Files Modified:**

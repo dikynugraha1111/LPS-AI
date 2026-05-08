@@ -8,9 +8,10 @@
 **Acceptance Criteria:**
 - [ ] EPB & Invoice menu shows a list of all EPBs belonging to the logged-in customer
 - [ ] Each list item displays: EPB Number, Amount (formatted IDR), Due Date, and current status badge
-- [ ] Status badges are color-coded: Unpaid (red), Pending Review (yellow), Payment Reject (orange), Paid (green)
+- [ ] Status badges are color-coded: Unpaid (red), Waiting Payment Verification (yellow), Payment Reject (orange), Paid (green)
 - [ ] List is sorted by most recently updated first
 - [ ] Clicking a list item opens the EPB detail page
+- [ ] EPB dengan status `UNPAID` menampilkan tombol "Pay" langsung di card list
 
 ## US-EI-02: View EPB Detail
 **As a** Customer,
@@ -35,18 +36,18 @@
 - [ ] Upload accepts PDF, JPG, PNG; rejects other formats with a clear error message
 - [ ] File larger than 5MB shows error: "Ukuran file maksimal 5MB"
 - [ ] Optional fields available: Bank Name, Reference Number, Payment Date
-- [ ] After clicking Submit: status changes to `PENDING_REVIEW` and the upload form closes
+- [ ] After clicking Submit: `epb_payments.status` dan `nominations.status` sama-sama berubah ke `WAITING_PAYMENT_VERIFICATION`
+- [ ] "Pay" button is hidden after submission; status badge berubah ke "Menunggu Verifikasi"
 - [ ] Customer receives in-app and email notification confirming submission
-- [ ] "Pay" button is hidden after submission
 
-## US-EI-04: Monitor Pending Review Status
+## US-EI-04: Monitor Waiting Payment Verification Status
 **As a** Customer,
 **I want to** see that my payment is being reviewed after I submit proof,
 **So that** I know my submission was received and I am waiting for a decision.
 
 **Acceptance Criteria:**
-- [ ] Status badge shows "Pending Review" with yellow color
-- [ ] No action buttons are visible while status is `PENDING_REVIEW`
+- [ ] Status badge shows "Menunggu Verifikasi Pembayaran" with yellow color
+- [ ] No action buttons are visible while status is `WAITING_PAYMENT_VERIFICATION`
 - [ ] The latest uploaded proof (file name + timestamp) is visible
 - [ ] Page/list auto-refreshes or polls to reflect STS decision within 1 minute
 
@@ -56,11 +57,13 @@
 **So that** my payment can be re-verified and approved.
 
 **Acceptance Criteria:**
-- [ ] Status badge shows "Payment Reject" with orange color
+- [ ] Status badge shows "Pembayaran Ditolak" with orange color
 - [ ] Rejection reason from STS is displayed clearly below the status
 - [ ] "Revision Data" button is only visible when status is `PAYMENT_REJECT`
-- [ ] Clicking "Revision Data" opens the same proof upload form as the Pay flow
-- [ ] After Submit: status changes back to `PENDING_REVIEW`
+- [ ] Clicking "Revision Data" opens the proof upload form
+- [ ] Upload accepts PDF, JPG, PNG; rejects other formats with a clear error message
+- [ ] File larger than 5MB shows error: "Ukuran file maksimal 5MB"
+- [ ] After Submit: `epb_payments.status` dan `nominations.status` sama-sama berubah ke `WAITING_PAYMENT_VERIFICATION`
 - [ ] Customer receives in-app and email notification confirming re-submission
 - [ ] Proof upload history shows both rejected and new uploads
 
@@ -70,7 +73,7 @@
 **So that** I have a record that my payment was accepted and my voyage is authorized.
 
 **Acceptance Criteria:**
-- [ ] Status badge shows "Paid" with green color
+- [ ] Status badge shows "Lunas" with green color
 - [ ] Confirmation timestamp (confirmed_at) is displayed
 - [ ] No action buttons are present
 - [ ] All proof upload history is visible for reference

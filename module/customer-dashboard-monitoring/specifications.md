@@ -29,9 +29,9 @@
 ### Endpoint: GET /api/customer/nominations
 Returns all nominations for the authenticated customer, ordered by `created_at DESC`.
 
-**Includes all statuses:** DRAFT, SUBMITTED, PENDING, APPROVED, NEED_REVISION, EPB_CONFIRMATION_SUBMITTED, PAYMENT_CONFIRMED, SUBMIT_FAILED.
+**Includes all statuses:** DRAFT, SUBMITTED, PENDING, APPROVED, NEED_REVISION, WAITING_PAYMENT_VERIFICATION, PAYMENT_CONFIRMED, SUBMIT_FAILED.
 
-> **Catatan (BRD v3.1):** Status `WAITING_PAYMENT_VERIFICATION` dan `PAYMENT_REJECTED` dihapus dari tabel `nominations`. Siklus verifikasi payment (UNPAID, PENDING_REVIEW, PAYMENT_REJECT, PAID) kini dikelola oleh M9b di tabel `epb_payments` — bukan di tabel `nominations`. Status `EPB_CONFIRMATION_SUBMITTED` menggantikan `WAITING_PAYMENT_VERIFICATION` sebagai terminal status M9 di tabel `nominations`.
+> **Catatan (BRD v3.1):** `nominations.status` mencerminkan status pembayaran secara paralel dengan `epb_payments.status`. Setelah customer upload proof di M9b, nominasi berubah ke `WAITING_PAYMENT_VERIFICATION`. Status detail payment (proof history, rejection reason) ada di tabel `epb_payments` (M9b).
 
 ### UI
 - Table: Nomination Number (or "Draft" if no number), Vessel Name, ETA, Status badge, Created At, Action button.
@@ -39,7 +39,7 @@ Returns all nominations for the authenticated customer, ordered by `created_at D
 - "New Nomination" button → `/customer/nominations/new`.
 - Clicking any row → `/customer/nominations/:id`.
 
-> **"Active" filter:** Excludes DRAFT, PAYMENT_CONFIRMED, EPB_CONFIRMATION_SUBMITTED, dan SUBMIT_FAILED. `EPB_CONFIRMATION_SUBMITTED` dikecualikan dari "Active" karena customer tidak perlu mengambil aksi di halaman ini — aksi selanjutnya ada di menu EPB & Invoice (M9b).
+> **"Active" filter:** Excludes DRAFT, PAYMENT_CONFIRMED, dan SUBMIT_FAILED. Termasuk `APPROVED` dan `WAITING_PAYMENT_VERIFICATION`.
 
 ## 3. Voyage Tracking (FR-CD-01)
 

@@ -60,9 +60,9 @@ CREATE INDEX idx_epb_nomination_id       ON nomination_epb(nomination_id);
 CREATE INDEX idx_status_history_nom_id   ON nomination_status_history(nomination_id);
 ```
 
-Nomination statuses managed in M9: `PENDING`, `APPROVED`, `NEED_REVISION`, `EPB_CONFIRMATION_SUBMITTED`
+Nomination statuses managed in M9: `PENDING`, `APPROVED`, `NEED_REVISION`, `WAITING_PAYMENT_VERIFICATION`, `PAYMENT_CONFIRMED`
 
-> `EPB_CONFIRMATION_SUBMITTED` is the terminal M9 status indicating the customer has submitted their first payment proof and data has been handed off to M9b. The full payment cycle (UNPAID, PENDING_REVIEW, PAYMENT_REJECT, PAID) is defined and managed in M9b.
+> Setelah customer upload proof di M9b, M9b backend ikut mengupdate `nominations.status = WAITING_PAYMENT_VERIFICATION`. Tidak ada status `EPB_CONFIRMATION_SUBMITTED`. Row `epb_payments` dibuat oleh M9 webhook handler (event APPROVED) dengan status `UNPAID`.
 
 ---
 
@@ -137,8 +137,13 @@ type ApprovedData struct {
 Actions:
 1. Update nomination: `status = APPROVED`, `anchor_point`, `etb`, `estimated_duration_hours`, `sts_nomination_id`.
 2. Insert into `nomination_epb`.
-3. Record status history (triggered_by: "sts_webhook").
-4. Send in-app + email notification to customer.
+3. **Otomatis buat row `epb_payments`** (defined in M9b schema) dengan status `UNPAID`, linked ke `nomination_epb.id` yang baru dibuat. Ini memunculkan EPB di menu M9b tanpa aksi customer.
+   ```sql
+   INSERT INTO epb_payments (id, nomination_id, epb_id, status)
+   VALUES (gen_random_uuid(), :nomination_id, :epb_id, 'UNPAID');
+   ```
+4. Record status history (triggered_by: "sts_webhook").
+5. Send in-app + email notification to customer.
 
 **Event: `NEED_REVISION`**
 ```go
@@ -213,36 +218,16 @@ Logic:
 
 ---
 
-## Step 6: Backend — EPB Confirmation Submit (First Payment Proof)
+## Step 6: Frontend — Tombol "Bayar EPB" (Link ke M9b)
 
-### POST /api/customer/nominations/:id/epb-confirmation
+Tidak ada endpoint backend baru di M9 untuk upload proof. M9 hanya menyediakan tombol navigasi ke M9b.
 
-Only allowed if `status = APPROVED`.
+Logika tampilan di `NominationStatusPage.tsx` (berdasarkan `nominations.status`):
+- Jika `status = APPROVED`: tampilkan tombol **"Bayar EPB"** → navigasi ke `/customer/epb-invoice`.
+- Jika `status = WAITING_PAYMENT_VERIFICATION`: sembunyikan tombol "Bayar EPB", tampilkan info banner teal:
+  `"Bukti pembayaran sedang diverifikasi. Lihat status di menu EPB & Invoice →"` (link ke `/customer/epb-invoice`).
 
-Multipart form: `file` field + optional metadata fields (bank_name, reference_number, payment_date).
-
-Validation:
-- File type: PDF, JPG, PNG only (check MIME type with `http.DetectContentType`)
-- Max size: 5MB (5 × 1024 × 1024 bytes)
-- Nomination must belong to authenticated customer
-- Nomination status must be `APPROVED`
-- Idempotency guard: reject if status is already `EPB_CONFIRMATION_SUBMITTED`
-
-Logic:
-1. Save file to storage: `uploads/nominations/:nomination_id/epb-confirmation/`.
-2. Create a new `epb_payments` record in M9b schema (status = `UNPAID`, linked to `nomination_epb.epb_number`).
-
-   ```sql
-   -- Defined in M9b migration, but INSERT happens here:
-   INSERT INTO epb_payments (id, nomination_id, epb_id, file_name, file_url, file_size_bytes, bank_name, reference_number, payment_date, status)
-   VALUES (..., 'UNPAID');
-   ```
-
-3. Update `nominations.status = EPB_CONFIRMATION_SUBMITTED`.
-4. Record status history (triggered_by: "customer").
-5. Return 201 with redirect hint: `{ "redirect_to": "/customer/epb-invoice" }`.
-
-> The `epb_payments` table is created by the M9b migration. M9 only inserts the first row. M9b handles all subsequent status transitions on that row.
+> Upload proof dilakukan sepenuhnya di M9b melalui `POST /api/customer/epb-payments/:id/proof`. M9b yang bertanggung jawab mengupdate `nominations.status` saat proof berhasil diupload.
 
 ---
 
@@ -258,24 +243,22 @@ Use TanStack React Query to fetch `/api/customer/nominations/:id/status`. Poll e
 | Status | Color | Display Text |
 |--------|-------|-------------|
 | PENDING | Blue | "Menunggu proses di STS Platform" |
-| APPROVED | Green | "Nominasi Disetujui — Silakan lengkapi Konfirmasi EPB" |
+| APPROVED | Green | "Nominasi Disetujui — Silakan lakukan pembayaran EPB" |
+| WAITING_PAYMENT_VERIFICATION | Teal | "Bukti pembayaran sedang diverifikasi — Lihat status di menu EPB & Invoice →" |
 | NEED_REVISION | Orange | "Perlu Revisi — [revision_notes]" |
-| EPB_CONFIRMATION_SUBMITTED | Teal | "Konfirmasi EPB terkirim — Lihat status di menu EPB & Invoice" |
 | SUBMIT_FAILED | Red | "Gagal Mengirim ke STS Platform" with Retry button |
 
 **Sections (show/hide based on status):**
 
 *Nomination Details* — always visible: vessel name, ETA, cargo type, qty, charterer, barge count, documents list.
 
-*Schedule & EPB* — visible only when status is `APPROVED` or `EPB_CONFIRMATION_SUBMITTED`:
+*Schedule & EPB* — visible when status is `APPROVED` or `WAITING_PAYMENT_VERIFICATION`:
 - Anchor Point, ETB (formatted date-time), Estimated Duration
 - EPB Number, Amount (format as "Rp XX.XXX.XXX"), Due Date
+- Tombol **"Bayar EPB"** → link ke `/customer/epb-invoice` (hanya tampil saat `APPROVED`)
 
-*EPB Confirmation Upload* — visible only when status is `APPROVED`:
-- File dropzone accepting PDF/JPG/PNG, max 5MB
-- Optional fields: Bank Name, Reference Number, Payment Date
-- "Submit Konfirmasi EPB" button
-- After successful submit: show success message and link to EPB & Invoice page
+*Info Banner EPB* — visible when status is `WAITING_PAYMENT_VERIFICATION`:
+- Teal info box: "Bukti pembayaran sedang diverifikasi." + link ke EPB & Invoice
 
 *Revision Form Link* — visible only when status is `NEED_REVISION`:
 - "Revisi Nominasi" button → navigate to `/customer/nominations/:id/revise`
@@ -299,17 +282,15 @@ Pre-fill form with existing nomination data. Same form as M8 NominationFormPage 
 ## Acceptance Checklist
 
 - [ ] STS webhook endpoint validates HMAC signature (rejects invalid signatures with 401)
-- [ ] `APPROVED` webhook: nomination status updates, EPB and schedule stored and displayed
+- [ ] `APPROVED` webhook: nomination status = `APPROVED`, EPB and schedule stored and displayed
+- [ ] `APPROVED` webhook: row `epb_payments` otomatis dibuat dengan status `UNPAID` (linked ke nomination_epb)
 - [ ] `NEED_REVISION` webhook: status updates, revision notes displayed, revision form accessible
 - [ ] Status changes within 1 minute of STS webhook receipt
 - [ ] Customer receives in-app + email notification on every status change
-- [ ] EPB section only visible when status is `APPROVED` or `EPB_CONFIRMATION_SUBMITTED`
-- [ ] EPB Confirmation upload accepts PDF/JPG/PNG, rejects other types with clear error
-- [ ] File > 5MB is rejected with clear error
-- [ ] After EPB Confirmation submit: `nominations.status` = `EPB_CONFIRMATION_SUBMITTED`
-- [ ] After EPB Confirmation submit: a new `epb_payments` row (status `UNPAID`) is created in M9b table
-- [ ] After EPB Confirmation submit: customer is redirected/linked to EPB & Invoice page (`/customer/epb-invoice`)
-- [ ] Duplicate EPB Confirmation submit is rejected (idempotency guard)
+- [ ] EPB section (Schedule & EPB + tombol "Bayar EPB") visible when status is `APPROVED`
+- [ ] Tombol "Bayar EPB" mengarah ke `/customer/epb-invoice`
+- [ ] Saat status `WAITING_PAYMENT_VERIFICATION`: tombol "Bayar EPB" disembunyikan, info banner teal tampil dengan link ke EPB & Invoice
+- [ ] Tidak ada endpoint upload proof di M9 — upload dilakukan di M9b
 - [ ] Revision form is only accessible when status is `NEED_REVISION`
 - [ ] Re-submission sets status back to `PENDING`
-- [ ] All status changes recorded in `nomination_status_history`
+- [ ] All nomination status changes recorded in `nomination_status_history`

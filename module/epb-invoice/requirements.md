@@ -6,14 +6,15 @@ Derived from BRD Section 3.4.9b and Section 2.1 Module 9b (BRD v3.1).
 
 | FR ID | Requirement | Actor | Priority |
 |-------|-------------|-------|----------|
-| FR-EI-01 | Sistem harus menyediakan menu EPB & Invoice di Customer Portal yang menampilkan daftar seluruh EPB customer beserta status pembayaran terkini (Unpaid, Pending Review, Payment Reject, Paid) | Customer | Must Have |
+| FR-EI-01 | Sistem harus menyediakan menu EPB & Invoice di Customer Portal yang menampilkan daftar seluruh EPB customer beserta status pembayaran terkini (Unpaid, Waiting Payment Verification, Payment Reject, Paid) | Customer | Must Have |
 | FR-EI-02 | Customer harus dapat melihat detail EPB dan Invoice (view-only) dengan mengklik item di daftar EPB & Invoice | Customer | Must Have |
-| FR-EI-03 | Untuk EPB berstatus **Unpaid**, customer harus dapat memulai proses pembayaran dengan mengklik tombol "Pay", kemudian mengupload bukti pembayaran dan mengisi data terkait, kemudian Submit | Customer | Must Have |
-| FR-EI-04 | Untuk EPB berstatus **Pending Review**, sistem harus menampilkan status dalam mode view-only; tidak ada aksi yang dapat dilakukan customer hingga STS Platform memberikan keputusan | Customer | Must Have |
+| FR-EI-03 | Untuk EPB berstatus **Unpaid**, customer harus dapat mengklik tombol "Pay", kemudian mengupload bukti pembayaran dan mengisi data terkait, kemudian Submit | Customer | Must Have |
+| FR-EI-04 | Untuk EPB berstatus **Waiting Payment Verification**, sistem harus menampilkan status dalam mode view-only; tidak ada aksi yang dapat dilakukan customer hingga STS Platform memberikan keputusan | Customer | Must Have |
 | FR-EI-05 | Untuk EPB berstatus **Payment Reject**, customer harus dapat mengklik "Revision Data" untuk mengupload ulang bukti pembayaran yang benar dan melakukan re-submit | Customer | Must Have |
 | FR-EI-06 | Untuk EPB berstatus **Paid**, sistem harus menampilkan detail dalam mode view-only sebagai konfirmasi bahwa pembayaran telah selesai | Customer | Must Have |
-| FR-EI-07 | Sistem harus menerima status update pembayaran dari STS Platform (Pending Review → Payment Reject / Paid) dan memperbarui tampilan di menu EPB & Invoice secara real-time | System | Must Have |
-| FR-EI-08 | Sistem harus mengirimkan data bukti pembayaran (upload dari FR-EI-03 atau FR-EI-05) ke STS Platform via API untuk proses verifikasi | System | Must Have |
+| FR-EI-07 | Sistem harus menerima status update pembayaran dari STS Platform (Payment Reject / Paid) dan memperbarui tampilan di menu EPB & Invoice secara real-time | System | Must Have |
+| FR-EI-08 | Sistem harus mengirimkan data bukti pembayaran (dari FR-EI-03 atau FR-EI-05) ke STS Platform via API untuk proses verifikasi | System | Must Have |
+| FR-EI-09 | Setelah customer upload proof (FR-EI-03 atau FR-EI-05), sistem harus mengupdate `nominations.status` menjadi `WAITING_PAYMENT_VERIFICATION` secara bersamaan dengan `epb_payments.status` | System | Must Have |
 
 ## Cross-Cutting Requirements
 

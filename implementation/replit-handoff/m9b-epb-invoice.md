@@ -7,13 +7,14 @@
 Continuation of the LPS Customer Portal. **Module 9b** is the EPB & Invoice menu — it manages the full payment verification cycle after a customer's first proof of payment has been submitted via M9 (EPB Confirmation). Requires M7 (auth), M8 (nominations), and M9 (EPB Confirmation) to be complete.
 
 The data flow is:
-1. M9: customer submits EPB Confirmation → creates `epb_payments` row (status `UNPAID`), redirects to this module.
+1. M9 webhook handler (event APPROVED) → otomatis buat `epb_payments` row (status `UNPAID`) tanpa aksi customer.
+2. Customer buka M9b, lihat EPB berstatus UNPAID, klik "Pay" → upload proof → status berubah ke `WAITING_PAYMENT_VERIFICATION` (di `epb_payments` DAN `nominations`).
 2. M9b (this module): customer pays → STS verifies → loop until `PAID`.
 
 ## Prerequisites
 - M7 complete: JWT auth, `customers` table.
 - M8 complete: `nominations`, `nomination_documents` tables.
-- M9 complete: `nomination_epb`, `nomination_status_history` tables; `EPB_CONFIRMATION_SUBMITTED` status works; `epb_payments` row is created by M9 Step 6.
+- M9 complete: `nomination_epb`, `nomination_status_history` tables; STS webhook APPROVED handler berfungsi dan otomatis membuat row `epb_payments` (status `UNPAID`) untuk setiap nominasi yang disetujui.
 - Env vars (same as M9): `STS_WEBHOOK_SECRET`, `STS_API_KEY`, `STS_PLATFORM_BASE_URL`
 
 ## Tech Stack
@@ -29,13 +30,13 @@ File: `migrations/XXXXXX_create_epb_payments_m9b.up.sql`
 
 ```sql
 -- Core payment tracking table
--- NOTE: The first row is inserted by M9 Step 6 (EPB Confirmation Submit)
+-- NOTE: First row inserted by M9 webhook handler (event APPROVED) with status UNPAID
 CREATE TABLE epb_payments (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nomination_id    UUID NOT NULL REFERENCES nominations(id) ON DELETE CASCADE,
     epb_id           UUID NOT NULL REFERENCES nomination_epb(id) ON DELETE CASCADE,
-    status           VARCHAR(30) NOT NULL DEFAULT 'UNPAID',
-    -- Allowed values: 'UNPAID' | 'PENDING_REVIEW' | 'PAYMENT_REJECT' | 'PAID'
+    status           VARCHAR(40) NOT NULL DEFAULT 'UNPAID',
+    -- Allowed values: 'UNPAID' | 'WAITING_PAYMENT_VERIFICATION' | 'PAYMENT_REJECT' | 'PAID'
     rejection_reason TEXT,
     confirmed_at     TIMESTAMPTZ,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -120,14 +121,7 @@ type STSEPBWebhookPayload struct {
 
 Route by `Event`:
 
-**Event: `EPB_PENDING_REVIEW`**
-```
-Actions:
-1. Find epb_payments by nomination_id + epb_number (via JOIN nomination_epb).
-2. Update epb_payments.status = 'PENDING_REVIEW', updated_at = now().
-3. Send in-app + email notification to customer: "Bukti pembayaran Anda sedang diverifikasi."
-4. Return 200 OK.
-```
+> `EPB_PENDING_REVIEW` is NOT handled here — M9 sets status directly to `WAITING_PAYMENT_VERIFICATION` when proof is uploaded.
 
 **Event: `EPB_PAYMENT_REJECT`**
 ```go
@@ -190,7 +184,7 @@ Guard: epb_payment must belong to authenticated customer (join check via nominat
 
 ---
 
-## Step 5: Backend — Upload Payment Proof
+## Step 5: Backend — Upload Payment Proof (Pay & Revision Data)
 
 ### POST /api/customer/epb-payments/:id/proof
 
@@ -198,14 +192,16 @@ Auth: Customer JWT.
 
 Validation:
 - `epb_payment.nomination.customer_id` must equal JWT customer ID.
-- `epb_payment.status` must be `UNPAID` or `PAYMENT_REJECT`.
+- `epb_payment.status` must be `UNPAID` (Pay flow) atau `PAYMENT_REJECT` (Revision Data flow).
 - File: PDF/JPG/PNG only, max 5MB.
 
 Logic:
 1. Validate file MIME type (`http.DetectContentType`).
 2. Save file: `uploads/epb-payments/:epb_payment_id/:timestamp_filename`.
 3. Insert `epb_payment_proofs` row.
-4. Update `epb_payments.status = 'PENDING_REVIEW'`, `updated_at = now()`.
+4. Dalam **satu transaksi DB**:
+   - Update `epb_payments.status = 'WAITING_PAYMENT_VERIFICATION'`, `rejection_reason = null`, `updated_at = now()`.
+   - Update `nominations.status = 'WAITING_PAYMENT_VERIFICATION'` (join via `epb_payments.nomination_id`).
 5. Async: send proof to STS Platform (Step 6).
 6. Return 201 with proof metadata.
 
@@ -231,7 +227,7 @@ Body (JSON):
 }
 ```
 
-Retry max 3× exponential backoff (0.5s, 1s, 2s). On all retries fail: log error + set `epb_payment_proofs.sts_sent_at = null` (leave it null as indicator). Do NOT surface this failure to the customer — `status` stays `PENDING_REVIEW`.
+Retry max 3× exponential backoff (0.5s, 1s, 2s). On all retries fail: log error + set `epb_payment_proofs.sts_sent_at = null` (leave it null as indicator). Do NOT surface this failure to the customer — `status` stays `WAITING_PAYMENT_VERIFICATION`.
 
 On success: update `epb_payment_proofs.sts_sent_at = now()`.
 
@@ -242,7 +238,7 @@ On success: update `epb_payment_proofs.sts_sent_at = now()`.
 File: `src/pages/customer/EPBInvoiceListPage.tsx`
 Route: `/customer/epb-invoice`
 
-Use TanStack React Query to fetch `GET /api/customer/epb-payments`. Refetch every 30 seconds while any item has status `PENDING_REVIEW`.
+Use TanStack React Query to fetch `GET /api/customer/epb-payments`. Refetch every 30 seconds while any item has status `WAITING_PAYMENT_VERIFICATION`.
 
 **Layout:**
 - Page title: "EPB & Invoice"
@@ -257,7 +253,7 @@ Use TanStack React Query to fetch `GET /api/customer/epb-payments`. Refetch ever
 | Status | Color | Label |
 |--------|-------|-------|
 | UNPAID | Red | Belum Dibayar |
-| PENDING_REVIEW | Yellow | Menunggu Verifikasi |
+| WAITING_PAYMENT_VERIFICATION | Yellow | Menunggu Verifikasi |
 | PAYMENT_REJECT | Orange | Pembayaran Ditolak |
 | PAID | Green | Lunas |
 
@@ -268,7 +264,7 @@ Use TanStack React Query to fetch `GET /api/customer/epb-payments`. Refetch ever
 File: `src/pages/customer/EPBInvoiceDetailPage.tsx`
 Route: `/customer/epb-invoice/:id`
 
-Fetch `GET /api/customer/epb-payments/:id`. Poll every 30 seconds if status is `PENDING_REVIEW`.
+Fetch `GET /api/customer/epb-payments/:id`. Poll every 30 seconds if status is `WAITING_PAYMENT_VERIFICATION`.
 
 **Sections:**
 
@@ -277,13 +273,17 @@ Fetch `GET /api/customer/epb-payments/:id`. Poll every 30 seconds if status is `
 - Related Nomination Number (link to nomination status page)
 - Current status badge + updated_at timestamp
 
+*Payment Action (only if UNPAID):*
+- "Pay" button → opens upload modal
+
+*Waiting Verification Info (only if WAITING_PAYMENT_VERIFICATION):*
+- Info box: "Menunggu Verifikasi Pembayaran — bukti pembayaran Anda sedang diproses oleh tim Finance."
+- No action buttons.
+
 *Rejection Info (only if PAYMENT_REJECT):*
 - Warning box: "Pembayaran Ditolak"
 - Rejection reason text from STS
 - "Revision Data" button → opens upload modal
-
-*Payment Action (only if UNPAID):*
-- "Pay" button → opens upload modal
 
 *Confirmation Info (only if PAID):*
 - Green success box: "Pembayaran telah dikonfirmasi"
@@ -293,12 +293,12 @@ Fetch `GET /api/customer/epb-payments/:id`. Poll every 30 seconds if status is `
 - Table: file name, upload timestamp, Bank Name, Reference Number, Payment Date
 - Multiple rows if rejected and re-uploaded
 
-**Upload Modal (shared for Pay and Revision Data):**
+**Upload Modal (shared for Pay dan Revision Data):**
 - File dropzone: PDF/JPG/PNG, max 5MB
 - Optional fields: Bank Name (text), Reference Number (text), Payment Date (date picker)
-- Submit button: "Submit Pembayaran" (for UNPAID) / "Submit Revisi" (for PAYMENT_REJECT)
+- Submit button: "Submit Pembayaran" (untuk UNPAID) / "Submit Revisi Pembayaran" (untuk PAYMENT_REJECT)
 - Loading state during upload
-- On success: close modal, refetch detail page, show toast "Bukti pembayaran berhasil diupload"
+- On success: close modal, refetch detail page, show toast "Bukti pembayaran berhasil diupload. Menunggu verifikasi."
 
 ---
 
@@ -329,27 +329,31 @@ Add route to router:
 
 **Webhook:**
 - [ ] `POST /api/webhooks/sts/epb-payment-status` validates HMAC signature
-- [ ] `EPB_PENDING_REVIEW` event: status updates to `PENDING_REVIEW`
 - [ ] `EPB_PAYMENT_REJECT` event: status updates to `PAYMENT_REJECT`, rejection_reason stored
 - [ ] `EPB_PAID` event: status updates to `PAID`, confirmed_at stored
 - [ ] Customer receives in-app + email notification on every webhook event
 - [ ] Status changes reflected in UI within 1 minute of webhook receipt
+- [ ] `EPB_PENDING_REVIEW` event is NOT implemented (not needed — M9 sets status directly)
 
 **API:**
 - [ ] `GET /api/customer/epb-payments` returns only the authenticated customer's EPBs
 - [ ] `GET /api/customer/epb-payments/:id` returns full detail + proof history
 - [ ] `POST /api/customer/epb-payments/:id/proof` rejects file types other than PDF/JPG/PNG
 - [ ] `POST /api/customer/epb-payments/:id/proof` rejects files > 5MB
-- [ ] Upload only allowed when status is `UNPAID` or `PAYMENT_REJECT`
-- [ ] After upload: status transitions to `PENDING_REVIEW`
+- [ ] Upload allowed when status is `UNPAID` (Pay flow) atau `PAYMENT_REJECT` (Revision Data flow)
+- [ ] After upload: `epb_payments.status` DAN `nominations.status` sama-sama berubah ke `WAITING_PAYMENT_VERIFICATION` dalam satu transaksi
+- [ ] `rejection_reason` di-clear saat re-upload dari PAYMENT_REJECT
 - [ ] Proof sent to STS Platform with retry (max 3×)
 - [ ] Customer cannot access another customer's EPB payments
 
 **Frontend:**
-- [ ] EPB & Invoice list page shows all EPBs with correct status badges
-- [ ] "Pay" button visible only for UNPAID, "Revision Data" only for PAYMENT_REJECT
+- [ ] EPB & Invoice list page shows all EPBs with correct status badges (UNPAID = red, WAITING_PAYMENT_VERIFICATION = yellow, PAYMENT_REJECT = orange, PAID = green)
+- [ ] "Pay" button visible only for UNPAID status
+- [ ] "Revision Data" button visible only for PAYMENT_REJECT status
+- [ ] Detail page shows Pay action section for UNPAID status
+- [ ] Detail page shows waiting info box for WAITING_PAYMENT_VERIFICATION status
 - [ ] Detail page shows rejection reason for PAYMENT_REJECT status
-- [ ] Upload modal validates file type and size before submitting
+- [ ] Upload modal shared untuk Pay dan Revision Data, submit label berbeda
 - [ ] After successful upload: status badge updates to "Menunggu Verifikasi"
 - [ ] Paid EPB shows no action buttons and displays confirmed_at timestamp
 - [ ] Navigation item added to customer sidebar
