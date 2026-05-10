@@ -23,6 +23,7 @@ The LPS Platform is a Vessel Traffic System (VTS) for the STS Bunati area, manag
 
 ```
 document/          ← Single source of truth (BRD, FSD, Swimlane)
+  brd/             ← BRD per modul (M1–M12), derived dari BRD utama — wajib sync
 module/            ← Derived sub-modules (scoped dev units)
 implementation/
   design/          ← Architecture, UI/UX, data models, API contracts
@@ -49,13 +50,44 @@ Do not skip stages or work backwards.
 
 ## Foundational Documents
 
-- `document/BRD-LPS-V3-Analysis.md` — current BRD (v3, April 2026, DRAFT)
+- `document/BRD-LPS-V3-Analysis.md` — current BRD (v3.2, Mei 2026, DRAFT) — **primary source of truth**
+- `document/brd/` — BRD per modul (M1–M12), turunan dari BRD utama untuk kemudahan membaca
 - `document/Swimlane-Analysis-LPS V3.md` — swimlane analysis
 - `document/BRD-LPS-Analysis.docx` — original BRD (binary, for reference only)
 
 **LPS scope (V3):** vessel monitoring, communications, safety, government integration, nomination request portal, monitoring dashboard.
 
 **Out of LPS scope (owned by STS Platform):** master data (vessels, stakeholders, rate cards), billing/PNBP/invoicing, reporting & analytics.
+
+---
+
+## BRD Per Modul — Dual-Update Rule (WAJIB)
+
+Folder `document/brd/` berisi satu file per modul (M1–M12) yang dipecah dari BRD utama agar lebih mudah dibaca.
+
+**Aturan wajib saat ada perubahan BRD:**
+
+1. Update `document/BRD-LPS-V3-Analysis.md` terlebih dahulu (sumber kebenaran utama).
+2. Dalam sesi yang **sama**, update file `document/brd/<modul>.md` yang terkait.
+3. Kedua file harus selalu konsisten — jangan pernah mengupdate salah satu saja.
+
+**File per modul:**
+
+| File | Modul |
+|------|-------|
+| `document/brd/m1-vessel-monitoring.md` | M1 — Vessel Monitoring & AIS Integration |
+| `document/brd/m2-vessel-communication.md` | M2 — Vessel Communication Management |
+| `document/brd/m3-government-integration.md` | M3 — Government Integration |
+| `document/brd/m4-incident-emergency.md` | M4 — Incident & Emergency Management |
+| `document/brd/m5-weather-monitoring.md` | M5 — Weather Monitoring & Alert System |
+| `document/brd/m6-radar-navigation.md` | M6 — Radar & Navigation Surveillance |
+| `document/brd/m7-customer-authentication.md` | M7 — Customer Authentication & Onboarding |
+| `document/brd/m8-nomination-submission.md` | M8 — Nomination Request Submission |
+| `document/brd/m9-nomination-status.md` | M9 — Nomination Status & EPB Confirmation |
+| `document/brd/m9b-epb-invoice.md` | M9b — EPB & Invoice (Customer Portal) |
+| `document/brd/m10-customer-dashboard.md` | M10 — Customer Dashboard & Monitoring |
+| `document/brd/m11-monitoring-dashboard.md` | M11 — Monitoring & Visibility Dashboard |
+| `document/brd/m12-system-configuration.md` | M12 — System Configuration |
 
 ---
 

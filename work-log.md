@@ -1,4 +1,32 @@
 
+## 2026-05-09T14:00:00+07:00
+- **Task Performed:** Membuat folder `document/brd/` berisi 13 file BRD per modul (M1–M12 + index README). Mengupdate `README.md` dan `CLAUDE.md` dengan aturan Dual-Update dan daftar file per modul.
+- **Files Modified:**
+  - `document/brd/README.md` — **file baru**: index seluruh file per modul, aturan sync, struktur setiap file
+  - `document/brd/m1-vessel-monitoring.md` — **file baru**: BRD M1
+  - `document/brd/m2-vessel-communication.md` — **file baru**: BRD M2
+  - `document/brd/m3-government-integration.md` — **file baru**: BRD M3
+  - `document/brd/m4-incident-emergency.md` — **file baru**: BRD M4
+  - `document/brd/m5-weather-monitoring.md` — **file baru**: BRD M5
+  - `document/brd/m6-radar-navigation.md` — **file baru**: BRD M6
+  - `document/brd/m7-customer-authentication.md` — **file baru**: BRD M7 (lengkap dengan link replit-handoff)
+  - `document/brd/m8-nomination-submission.md` — **file baru**: BRD M8
+  - `document/brd/m9-nomination-status.md` — **file baru**: BRD M9 (termasuk tabel STS webhook)
+  - `document/brd/m9b-epb-invoice.md` — **file baru**: BRD M9b (termasuk flow diagram 4 status)
+  - `document/brd/m10-customer-dashboard.md` — **file baru**: BRD M10
+  - `document/brd/m11-monitoring-dashboard.md` — **file baru**: BRD M11
+  - `document/brd/m12-system-configuration.md` — **file baru**: BRD M12
+  - `README.md` — tambah section `/document/brd/` dengan Dual-Update Invariant rule
+  - `CLAUDE.md` — update directory architecture, tambah section "BRD Per Modul — Dual-Update Rule", update Foundational Documents
+- **Logic / Decisions Made:**
+  - **Sumber kebenaran tetap satu:** `BRD-LPS-V3-Analysis.md` adalah primary source of truth. File di `document/brd/` adalah *derived views* — bukan duplikasi independen.
+  - **Dual-Update Invariant:** setiap kali BRD utama diupdate, file `brd/<modul>.md` yang terkait harus diupdate dalam sesi yang sama. Aturan ini didokumentasikan di CLAUDE.md, README.md, dan `document/brd/README.md` agar AI agent berikutnya memahaminya.
+  - **Konten setiap file:** Definisi, Tujuan, Cakupan, FR table, Role & Access, cross-reference ke BRD utama + module/ + replit-handoff (jika ada). Tidak ada konten baru — semua diambil verbatim dari BRD utama.
+  - **Modul M7–M10 diberi link ke replit-handoff** karena sudah ada artefak implementasi yang bisa langsung dinavigasi dari file BRD per modul.
+- **Results / Next Steps:**
+  - Folder `document/brd/` siap digunakan sebagai referensi baca per modul.
+  - Saat ada update BRD di sesi berikutnya, AI agent harus mengikuti Dual-Update Rule: update BRD utama → update file brd/<modul> terkait.
+
 ## 2026-05-09T12:00:00+07:00
 - **Task Performed:** Gap analysis antara BRD v3.1 dan seluruh perubahan arsitektur yang telah dilakukan di session sebelumnya (08–09 Mei 2026). Update BRD ke versi 3.2 untuk mensinkronkan 6 area yang tidak konsisten.
 - **Files Modified:**

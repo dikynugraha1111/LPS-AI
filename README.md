@@ -54,6 +54,19 @@ When executing any task, follow this loop:
 - Keep documents **authoritative and durable**.
 - Avoid duplicating “source of truth” content elsewhere.
 
+#### `/document/brd/` — BRD Per Modul (Derived, Read-Optimized)
+**Description:**
+- Contains **one Markdown file per module**, split from the main BRD (`document/BRD-LPS-V3-Analysis.md`) for easier reading.
+- Each file covers: Definisi, Tujuan, Cakupan, Functional Requirements, Role & Access, and cross-references for one specific module.
+
+**Critical rule — Dual-Update Invariant:**
+- `document/BRD-LPS-V3-Analysis.md` is **always the primary source of truth**.
+- `document/brd/<module>.md` files are **derived views**. They must never be edited in isolation.
+- **When a BRD update is needed:** update `BRD-LPS-V3-Analysis.md` first, then immediately update the relevant `document/brd/<module>.md` file in the same work session.
+- Never let the two fall out of sync.
+
+**Index:** [`document/brd/README.md`](./document/brd/README.md)
+
 ---
 
 ### `/module/` — Derived Modules (Development Scoping)
