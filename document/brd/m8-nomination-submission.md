@@ -25,12 +25,6 @@ Modul yang mengelola proses pengajuan nominasi kapal oleh customer melalui LPS P
 - Opsi simpan sebagai Draft atau Submit langsung.
 - Generate Nomor Nominasi otomatis setelah submit.
 - Pengiriman data nominasi ke STS Platform via API setelah submit.
-- Pilihan upload dokumen: (1) Upload dari lokal → otomatis tersimpan ke Document Master; (2) Pilih dari Document Master yang sudah ada.
-
-## Out of Scope
-
-- Approval nominasi — dilakukan oleh STS Platform (bukan LPS).
-- Scheduling dan resource assignment — dilakukan oleh STS Platform.
 
 ---
 

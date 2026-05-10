@@ -1,4 +1,20 @@
 
+## 2026-05-09T15:00:00+07:00
+- **Task Performed:** Review menyeluruh semua 13 file BRD per modul di `document/brd/` dan perbaiki 5 ketidakkonsistenan yang ditemukan dibanding BRD utama.
+- **Files Modified:**
+  - `document/brd/m9-nomination-status.md` — **rewrite Cakupan**: sebelumnya hanya ada sub-header kosong tanpa isi; sekarang diisi verbatim dari BRD utama Section 2.1 M9 (Status Tracking + EPB Detail + Batasan Modul + blockquote). Role & Access juga dilengkapi dengan semua role (sebelumnya hanya 3 role).
+  - `document/brd/m7-customer-authentication.md` — (1) Cakupan: baris terakhir dipotong, tambah "(NPWP, NIP, Company Profile)" sesuai BRD utama; (2) FR-CA-01: kalimat dipotong, tambah "dan tidak ditampilkan sebagai field input di form registrasi" sesuai BRD utama.
+  - `document/brd/m8-nomination-submission.md` — Cakupan: hapus baris "Pilihan upload dokumen..." (tidak ada di BRD utama Section 2.1 M8; itu konten dari FR-CD-07 M10). Hapus section "Out of Scope" (tidak ada di BRD utama untuk M8).
+  - `document/brd/m11-monitoring-dashboard.md` — (1) Definisi: dipotong menjadi satu kalimat ringkas; sekarang verbatim dari BRD utama; (2) Cakupan baris terakhir: "Customer mendapat view terbatas" → "Pemilik Kapal mendapat view terbatas sesuai hak akses masing-masing" sesuai BRD utama; (3) Hapus section "Out of Scope" dan ganti dengan blockquote Catatan verbatim dari BRD utama.
+  - `document/brd/m12-system-configuration.md` — (1) Definisi: dipotong 1 kalimat; tambah "Modul ini merupakan sisa dari Master Data & Configuration sebelumnya, setelah data master entity (vessel, stakeholder, rate card) dipindahkan ke STS Platform"; (2) STS Platform API: tambah **bold** sesuai BRD utama; (3) Catatan: format diubah ke blockquote + tambah kalimat terakhir tentang sync registrasi customer ke STS Platform.
+- **Logic / Decisions Made:**
+  - Prinsip: konten di `document/brd/` harus **verbatim** dari BRD utama — tidak boleh diparafrase, dipotong, atau ditambah konten yang tidak ada di BRD utama.
+  - M8 "Out of Scope" dan M11 "Out of Scope" adalah konten tambahan yang tidak ada di BRD utama — dihapus.
+  - M8 "Pilihan upload dokumen" adalah konten yang terambil dari FR-CD-07 M10 secara tidak tepat — dihapus.
+- **Results / Next Steps:**
+  - Semua 13 file BRD per modul kini verbatim dan konsisten dengan BRD utama.
+  - Tidak ada perbedaan substansial antara `document/brd/` dan `document/BRD-LPS-V3-Analysis.md`.
+
 ## 2026-05-09T14:00:00+07:00
 - **Task Performed:** Membuat folder `document/brd/` berisi 13 file BRD per modul (M1–M12 + index README). Mengupdate `README.md` dan `CLAUDE.md` dengan aturan Dual-Update dan daftar file per modul.
 - **Files Modified:**

@@ -10,7 +10,7 @@
 
 ## Definisi
 
-Sub-modul yang mengelola konfigurasi sistem LPS, pengelolaan user dan role, serta parameter operasional.
+Sub-modul yang mengelola konfigurasi sistem LPS, pengelolaan user dan role, serta parameter operasional. Modul ini merupakan sisa dari Master Data & Configuration sebelumnya, setelah data master entity (vessel, stakeholder, rate card) dipindahkan ke STS Platform.
 
 ## Tujuan
 
@@ -28,7 +28,7 @@ Sub-modul yang mengelola konfigurasi sistem LPS, pengelolaan user dan role, sert
 ### System Configuration
 - Weather threshold configuration (gelombang, angin, visibilitas).
 - Alert & notifikasi configuration.
-- Integrasi API configuration (Inaportnet, SIMoPEL, Weather API, AIS Provider, STS Platform API).
+- Integrasi API configuration (Inaportnet, SIMoPEL, Weather API, AIS Provider, **STS Platform API**).
 - AIS message template configuration.
 - Data retention parameter configuration.
 
@@ -41,9 +41,7 @@ Sub-modul yang mengelola konfigurasi sistem LPS, pengelolaan user dan role, sert
 - Immutable log seluruh aktivitas sistem.
 - Filter berdasarkan entity type, actor, dan rentang waktu.
 
-## Catatan
-
-> Data master vessel, stakeholder, zona perairan, anchor point, dan rate card dikelola oleh STS Platform dan dikonsumsi oleh LPS melalui API sinkronisasi. LPS menyimpan local cache data master untuk operasional, dengan mekanisme sync berkala.
+> **Catatan:** Data master vessel, stakeholder, zona perairan, anchor point, dan rate card dikelola oleh STS Platform dan dikonsumsi oleh LPS melalui API sinkronisasi. LPS menyimpan local cache data master untuk operasional, dengan mekanisme sync berkala. Registrasi customer baru di LPS Portal akan disinkronisasi ke STS Platform secara otomatis.
 
 ---
 

@@ -10,7 +10,7 @@
 
 ## Definisi
 
-Modul yang menyediakan dashboard monitoring operasional real-time untuk seluruh stakeholder LPS. Fokus pada visualisasi data operasional secara real-time — bukan laporan periodik.
+Modul yang menyediakan dashboard monitoring operasional real-time untuk seluruh stakeholder LPS. Modul ini menggantikan Reporting & Analytics yang telah dipindahkan ke STS Platform, dengan fokus khusus pada visualisasi data operasional secara real-time.
 
 ## Tujuan
 
@@ -25,12 +25,9 @@ Modul yang menyediakan dashboard monitoring operasional real-time untuk seluruh 
 - Panel recent activity: kapal masuk/keluar, alert terbaru, komunikasi terakhir.
 - Status integrasi API pemerintah (Inaportnet, SIMoPEL, Bea Cukai) — last sync status.
 - Weather widget real-time dengan indikator level bahaya.
-- Akses dashboard sesuai role (KSOP, Bea Cukai, Customer mendapat view terbatas).
+- Akses dashboard sesuai role (KSOP, Bea Cukai, Pemilik Kapal mendapat view terbatas sesuai hak akses masing-masing).
 
-## Out of Scope
-
-- Laporan periodik (harian/bulanan/tahunan) → STS Platform.
-- Laporan billing dan export PDF/Excel → STS Platform.
+> **Catatan:** Laporan periodik (harian/bulanan/tahunan), laporan billing, dan export PDF/Excel dikelola oleh STS Platform melalui modul Operational & Financial Reporting.
 
 ---
 
