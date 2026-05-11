@@ -1,4 +1,52 @@
 
+## 2026-05-11T02:00:00+07:00
+- **Task Performed:** Jalankan implementation pipeline M12 — System Configuration. Buat 4 file module/ dan 1 file replit-handoff dari nol, menggunakan BRD M12 sebagai scope aktif dan old-data (Master Data lama) sebagai referensi implementasi yang sudah berjalan.
+- **Files Modified:**
+  - `module/system-configuration/README.md` — **file baru**: overview, in/out scope, dependency matrix, key decisions (data master di STS Platform, local cache, warisan dari old-data)
+  - `module/system-configuration/requirements.md` — **file baru**: FR-SC-01 s/d FR-SC-06, tabel cakupan per sub-modul, daftar 9 system roles, cross-cutting NFR
+  - `module/system-configuration/specifications.md` — **file baru**: 6 section teknis — (1) User & Role Management: business rules, DB schema (roles, admin_users, role_permissions), API endpoints; (2) System Configuration: business rules, DB schema (system_configs, api_configs, alert_configs), API endpoints; (3) Equipment Management: business rules, DB schema (equipment, equipment_status_history), API endpoints; (4) Audit Log: business rules, DB schema (audit_logs + indexes), API endpoint; (5) STS Data Sync: business rules, DB schema (sts_vessels_cache, sts_sync_log), API endpoints; (6) Frontend routes
+  - `module/system-configuration/user-stories.md` — **file baru**: US-SC-01 s/d US-SC-05 (User & Role, Permission Matrix, System & API Config, Equipment, Audit Log & STS Sync) dengan acceptance criteria testable
+  - `implementation/replit-handoff/m12-system-configuration.md` — **file baru**: 14 step eksekusi — Step 1 migration (IF NOT EXISTS, catatan cek tabel yang sudah ada), Step 2 seed data (roles, system_configs, api_configs, alert_configs), Step 3 Go models, Step 4 audit log helper, Step 5 encryption helper (AES-256-GCM), Step 6 handlers (8 grup endpoint), Step 7 settings layout sidebar, Step 8–14 frontend pages (User, Role/Permission, SystemConfig, ApiIntegrations, Equipment, AuditLog, StsSync) + acceptance checklist 20 item
+- **Logic / Decisions Made:**
+  - **Referensi old-data digunakan sebagai baseline:** System roles (9 role), business rules user (BR-SC-01 s/d 06), equipment types dan status, API integration names — semua diwarisi dari implementasi admin yang sudah berjalan. Pipeline baru tidak mengubah, hanya melengkapi dan memformalisasi.
+  - **Scope M12 sudah dikurangi dari old-data:** Vessel Master, Stakeholder Master, Zone, Anchor Point, Rate Card semua OUT of scope M12 — sudah di STS Platform. M12 hanya: user/role, system config, equipment, audit log, STS sync.
+  - **Migration pakai IF NOT EXISTS:** Handoff menegaskan agar Replit Agent cek tabel yang sudah ada sebelum menjalankan migration, menghindari conflict dengan tabel admin yang mungkin sudah ada.
+  - **API key masking:** Tidak pernah return plaintext credential dari API; `MaskValue()` helper dibuat eksplisit; field kosong saat update = tidak overwrite.
+  - **Audit log immutable:** Tidak ada endpoint POST/PUT/DELETE untuk audit_logs selain write dari handler internal.
+- **Results / Next Steps:**
+  - Pipeline M12 lengkap: module/ (4 file) + replit-handoff (1 file).
+  - Siap dihandoff ke Replit Agent. Replit Agent harus baca Prerequisites dan catatan "Penting: Cek tabel yang sudah ada" di Step 1 sebelum menjalankan migration.
+
+## 2026-05-11T01:00:00+07:00
+- **Task Performed:** Sinkronisasi fitur Additional Service M8 ke seluruh implementation pipeline: module/ (3 file) + replit-handoff.
+- **Files Modified:**
+  - `module/nomination-submission/requirements.md` — sisipkan FR-NS-03 (Additional Service); renumber FR-NS-03→04, 04→05; update FR-NS-05→06 dengan keterangan payload STS.
+  - `module/nomination-submission/specifications.md` — tambah Section 2 "Additional Service" (tabel 7 service keys, behavior, DB); renumber section 2–7 menjadi 3–8; tambah tabel `nomination_additional_services` di DB schema; tambah field `additional_services` di STS payload.
+  - `module/nomination-submission/user-stories.md` — update AC US-NS-01 (tambah checkbox AC); sisipkan US-NS-02 baru "Select Additional Service" dengan 5 AC; renumber US-NS-02→US-NS-03, US-NS-03→US-NS-04.
+  - `implementation/replit-handoff/m8-nomination-submission.md` — (1) Migration: tambah tabel `nomination_additional_services`; (2) Model: tambah `NominationAdditionalService` struct + relasi di `Nomination`; (3) Repository: tambah method `SetAdditionalServices`; (4) Handler: tambah field `additional_services` di request body, tambah validasi service key, panggil `SetAdditionalServices` di draft dan submit flow; (5) STS payload: tambah field `additional_services`; (6) Frontend: tambah section checkbox 7 pilihan di NominationFormPage; (7) Acceptance checklist: tambah 5 item terkait Additional Service.
+- **Logic / Decisions Made:**
+  - Additional Service disimpan di tabel terpisah `nomination_additional_services` (many-to-many dengan UNIQUE constraint), bukan sebagai array column di tabel `nominations` — lebih query-friendly dan tidak bergantung pada tipe array PostgreSQL.
+  - `SetAdditionalServices` menggunakan delete-then-insert dalam satu transaksi untuk mendukung edit Draft yang mengubah pilihan.
+  - Validasi service key dilakukan di backend pada saat submit untuk mencegah nilai invalid masuk ke DB atau payload STS.
+  - Payload STS selalu menyertakan `additional_services` (bisa `[]`) agar STS Platform tidak perlu handle field absent.
+- **Results / Next Steps:**
+  - Semua 4 layer pipeline M8 (BRD → module → replit-handoff) kini sinkron untuk fitur Additional Service.
+  - Siap dihandoff ke Replit Agent.
+
+## 2026-05-11T00:00:00+07:00
+- **Task Performed:** Tambah fitur Additional Service (opsional, multi-select) ke M8 — Nomination Request Submission. Sinkronisasi ke BRD utama dan file BRD per modul.
+- **Files Modified:**
+  - `document/BRD-LPS-V3-Analysis.md` — (1) Section 2.1 M8 Cakupan: tambah bullet Additional Service dengan 7 pilihan; (2) Section 3.4.8: tambah FR-NS-03 baru (Additional Service), renumber FR-NS-03→FR-NS-04, FR-NS-04→FR-NS-05, update FR-NS-05→FR-NS-06 (tambah keterangan "termasuk daftar Additional Service yang dipilih").
+  - `document/brd/m8-nomination-submission.md` — Cakupan dan tabel FR diupdate verbatim sesuai BRD utama.
+- **Logic / Decisions Made:**
+  - Additional Service bersifat opsional: customer boleh tidak memilih sama sekali, boleh memilih lebih dari satu.
+  - Daftar 7 pilihan: Tank Cleaning, Pengisian Bahan Bakar atau Air Bersih (Bunkering & Fresh Water Supplying), Short Stay Temporary, Supply Logistic, Lay Up, Ship Chandler, Kapal Emergency.
+  - FR-NS-03 baru disisipkan di antara FR-NS-02 dan FR-NS-03 lama (Draft) sehingga alur logis form → additional service → draft → submit → generate → kirim ke STS.
+  - FR-NS-06 (sebelumnya FR-NS-05) diupdate untuk menegaskan bahwa payload ke STS Platform menyertakan Additional Service yang dipilih.
+- **Results / Next Steps:**
+  - BRD utama dan `document/brd/m8-nomination-submission.md` kini sinkron.
+  - Layer `module/nomination-submission/` dan `implementation/replit-handoff/m8-nomination-submission.md` belum diupdate — perlu disinkronkan jika pekerjaan dilanjutkan ke tahap implementasi.
+
 ## 2026-05-09T15:00:00+07:00
 - **Task Performed:** Review menyeluruh semua 13 file BRD per modul di `document/brd/` dan perbaiki 5 ketidakkonsistenan yang ditemukan dibanding BRD utama.
 - **Files Modified:**

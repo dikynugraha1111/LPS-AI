@@ -22,6 +22,7 @@ Modul yang mengelola proses pengajuan nominasi kapal oleh customer melalui LPS P
 
 - Form pengajuan nominasi dengan field: Vessel Name, ETA, Cargo Type, Cargo Quantity, Charterer, Estimasi Jumlah Barge.
 - Upload dokumen pendukung: Rencana Kerja, Shipping Instruction, Surat Penunjukan PBM, Nomor PKK (input manual).
+- Pilihan Additional Service yang bersifat opsional dan dapat dipilih lebih dari satu: Tank Cleaning, Pengisian Bahan Bakar atau Air Bersih (Bunkering & Fresh Water Supplying), Short Stay Temporary, Supply Logistic, Lay Up, Ship Chandler, Kapal Emergency.
 - Opsi simpan sebagai Draft atau Submit langsung.
 - Generate Nomor Nominasi otomatis setelah submit.
 - Pengiriman data nominasi ke STS Platform via API setelah submit.
@@ -34,9 +35,10 @@ Modul yang mengelola proses pengajuan nominasi kapal oleh customer melalui LPS P
 |-------|-------------|-------|
 | FR-NS-01 | Sistem harus menyediakan form pengajuan nominasi dengan field: Vessel Name, ETA, Cargo Type, Cargo Quantity, Charterer, Estimasi Jumlah Barge | Customer |
 | FR-NS-02 | Customer harus dapat mengupload dokumen pendukung nominasi: Rencana Kerja, Shipping Instruction, Surat Penunjukan PBM, Nomor PKK (input manual) | Customer |
-| FR-NS-03 | Customer harus dapat menyimpan nominasi sebagai Draft sebelum melakukan Submit | Customer |
-| FR-NS-04 | Sistem harus mengenerate Nomor Nominasi otomatis setelah customer melakukan Submit | System |
-| FR-NS-05 | Sistem harus mengirimkan data nominasi ke STS Platform via API setelah customer melakukan Submit | System |
+| FR-NS-03 | Customer harus dapat memilih Additional Service yang bersifat opsional (boleh tidak dipilih, boleh dipilih lebih dari satu) dari daftar berikut: Tank Cleaning, Pengisian Bahan Bakar atau Air Bersih (Bunkering & Fresh Water Supplying), Short Stay Temporary, Supply Logistic, Lay Up, Ship Chandler, Kapal Emergency | Customer |
+| FR-NS-04 | Customer harus dapat menyimpan nominasi sebagai Draft sebelum melakukan Submit | Customer |
+| FR-NS-05 | Sistem harus mengenerate Nomor Nominasi otomatis setelah customer melakukan Submit | System |
+| FR-NS-06 | Sistem harus mengirimkan data nominasi ke STS Platform via API setelah customer melakukan Submit, termasuk daftar Additional Service yang dipilih (jika ada) | System |
 
 ---
 

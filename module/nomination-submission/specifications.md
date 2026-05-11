@@ -22,14 +22,33 @@
 
 Note: Documents are optional when saving as Draft. All documents required for final Submit.
 
-## 2. Draft Behavior (FR-NS-03)
+## 2. Additional Service (FR-NS-03)
+
+Customer dapat memilih satu atau lebih Additional Service, atau tidak memilih sama sekali (opsional).
+
+| Service Key | Label |
+|-------------|-------|
+| `TANK_CLEANING` | Tank Cleaning |
+| `BUNKERING_FRESHWATER` | Pengisian Bahan Bakar atau Air Bersih (Bunkering & Fresh Water Supplying) |
+| `SHORT_STAY_TEMPORARY` | Short Stay Temporary |
+| `SUPPLY_LOGISTIC` | Supply Logistic |
+| `LAY_UP` | Lay Up |
+| `SHIP_CHANDLER` | Ship Chandler |
+| `KAPAL_EMERGENCY` | Kapal Emergency |
+
+- Pilihan ditampilkan sebagai checkbox multi-select di form nominasi.
+- Boleh dikosongkan (0 pilihan) atau dipilih lebih dari satu.
+- Tersimpan di tabel `nomination_additional_services` (many-to-many via nomination_id).
+- Ikut disertakan dalam payload ke STS Platform saat submit.
+
+## 3. Draft Behavior (FR-NS-04)
 - Customer can save at any point with any subset of fields filled.
 - Draft is stored with `status = DRAFT`.
 - Draft is visible in the Nomination Status page (M10 FR-CD-02).
 - Customer can re-open and edit draft multiple times.
 - Draft is NOT sent to STS Platform.
 
-## 3. Submit Flow (FR-NS-04, FR-NS-05)
+## 4. Submit Flow (FR-NS-05, FR-NS-06)
 
 ### Pre-submit Validation
 1. All form fields must be filled.
@@ -59,6 +78,7 @@ Note: Documents are optional when saving as Draft. All documents required for fi
   "charterer": "PT Example",
   "estimated_barge_count": 3,
   "nomor_pkk": "PKK-2026-001",
+  "additional_services": ["TANK_CLEANING", "SUPPLY_LOGISTIC"],
   "documents": [
     { "type": "RENCANA_KERJA", "url": "https://storage.lps.internal/..." },
     { "type": "SHIPPING_INSTRUCTION", "url": "..." },
@@ -68,14 +88,16 @@ Note: Documents are optional when saving as Draft. All documents required for fi
 }
 ```
 
-## 4. Nomination Status Lifecycle (this module scope)
+`additional_services` adalah array string (service keys). Kirim array kosong `[]` jika tidak ada pilihan.
+
+## 5. Nomination Status Lifecycle (this module scope)
 ```
 DRAFT → SUBMITTED → PENDING (after STS ACK)
                   ↘ SUBMIT_FAILED (STS call failed after retries)
 ```
 Statuses beyond PENDING are handled by M9.
 
-## 5. Database Schema
+## 6. Database Schema
 
 ```sql
 CREATE TABLE nominations (
@@ -99,6 +121,15 @@ CREATE TABLE nominations (
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE nomination_additional_services (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nomination_id  UUID NOT NULL REFERENCES nominations(id) ON DELETE CASCADE,
+    service_key    VARCHAR(50) NOT NULL,
+    -- TANK_CLEANING | BUNKERING_FRESHWATER | SHORT_STAY_TEMPORARY
+    -- SUPPLY_LOGISTIC | LAY_UP | SHIP_CHANDLER | KAPAL_EMERGENCY
+    UNIQUE (nomination_id, service_key)
+);
+
 CREATE TABLE nomination_documents (
     id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nomination_id        UUID NOT NULL REFERENCES nominations(id),
@@ -113,7 +144,7 @@ CREATE TABLE nomination_documents (
 );
 ```
 
-## 6. API Endpoints
+## 7. API Endpoints
 
 | Method | Path | Description | Auth |
 |--------|------|-------------|------|
@@ -124,7 +155,7 @@ CREATE TABLE nomination_documents (
 | POST | /api/customer/nominations/:id/submit | Submit draft nomination | Customer JWT |
 | POST | /api/customer/nominations/:id/documents | Upload document to nomination | Customer JWT |
 
-## 7. Frontend Routes
+## 8. Frontend Routes
 
 | Route | Component | Description |
 |-------|-----------|-------------|

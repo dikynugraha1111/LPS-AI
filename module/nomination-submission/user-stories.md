@@ -8,12 +8,26 @@
 **Acceptance Criteria:**
 - [ ] Nomination form shows fields: Vessel Name, ETA, Cargo Type, Cargo Quantity (MT), Charterer, Estimasi Jumlah Barge
 - [ ] Form shows document upload areas for: Rencana Kerja, Shipping Instruction, Surat Penunjukan PBM, and text input for Nomor PKK
+- [ ] Form shows Additional Service section with 7 checkbox options
 - [ ] Customer can click "Simpan Draft" with any subset of fields filled (no required field validation on Draft save)
+- [ ] Additional Service selection (including empty selection) is saved on Draft save
 - [ ] Draft is saved with status DRAFT and appears in Nomination Status list
 - [ ] Customer can re-open and edit draft from the Nomination Status page
 - [ ] ETA field rejects past dates
 
-## US-NS-02: Upload Supporting Documents
+## US-NS-02: Select Additional Service
+**As a** Customer,  
+**I want to** optionally select one or more additional services in my nomination,  
+**So that** STS Platform knows what extra services I need during the vessel operation.
+
+**Acceptance Criteria:**
+- [ ] Additional Service section shows 7 checkboxes: Tank Cleaning, Pengisian Bahan Bakar atau Air Bersih (Bunkering & Fresh Water Supplying), Short Stay Temporary, Supply Logistic, Lay Up, Ship Chandler, Kapal Emergency
+- [ ] Customer can select zero, one, or multiple services
+- [ ] Selected services are preserved when re-opening a Draft
+- [ ] Selected services are included in the STS Platform payload on Submit
+- [ ] If no service is selected, `additional_services` is sent as empty array `[]` to STS Platform
+
+## US-NS-03: Upload Supporting Documents
 **As a** Customer,  
 **I want to** upload supporting documents to my nomination,  
 **So that** the STS Platform has all required information to process my nomination.
@@ -25,7 +39,7 @@
 - [ ] Uploaded document shows file name and upload status (success/failed)
 - [ ] Customer can replace an uploaded document by uploading again
 
-## US-NS-03: Submit Nomination to STS Platform
+## US-NS-04: Submit Nomination to STS Platform
 **As a** Customer,  
 **I want to** submit my completed nomination,  
 **So that** it is sent to STS Platform for approval and scheduling.

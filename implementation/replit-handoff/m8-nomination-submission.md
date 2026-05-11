@@ -38,6 +38,15 @@ CREATE TABLE nominations (
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE nomination_additional_services (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nomination_id  UUID NOT NULL REFERENCES nominations(id) ON DELETE CASCADE,
+    service_key    VARCHAR(50) NOT NULL,
+    -- TANK_CLEANING | BUNKERING_FRESHWATER | SHORT_STAY_TEMPORARY
+    -- SUPPLY_LOGISTIC | LAY_UP | SHIP_CHANDLER | KAPAL_EMERGENCY
+    UNIQUE (nomination_id, service_key)
+);
+
 CREATE TABLE nomination_documents (
     id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nomination_id        UUID NOT NULL REFERENCES nominations(id) ON DELETE CASCADE,
@@ -55,6 +64,8 @@ CREATE INDEX idx_nominations_status      ON nominations(status);
 ```
 
 Valid `document_type` values: `RENCANA_KERJA`, `SHIPPING_INSTRUCTION`, `SURAT_PENUNJUKAN_PBM`
+
+Valid `service_key` values: `TANK_CLEANING`, `BUNKERING_FRESHWATER`, `SHORT_STAY_TEMPORARY`, `SUPPLY_LOGISTIC`, `LAY_UP`, `SHIP_CHANDLER`, `KAPAL_EMERGENCY`
 
 ---
 
@@ -99,7 +110,14 @@ type Nomination struct {
     SubmittedAt         *time.Time
     CreatedAt           time.Time
     UpdatedAt           time.Time
-    Documents           []NominationDocument `gorm:"foreignKey:NominationID"`
+    AdditionalServices  []NominationAdditionalService `gorm:"foreignKey:NominationID"`
+    Documents           []NominationDocument          `gorm:"foreignKey:NominationID"`
+}
+
+type NominationAdditionalService struct {
+    ID           uuid.UUID `gorm:"type:uuid;primaryKey"`
+    NominationID uuid.UUID `gorm:"not null"`
+    ServiceKey   string    `gorm:"not null"`
 }
 
 type NominationDocument struct {
@@ -118,6 +136,7 @@ File: `internal/nomination/repository.go`
 - `FindByID(ctx, id) (*Nomination, error)`
 - `FindByCustomerID(ctx, customerID) ([]Nomination, error)`
 - `Update(ctx, nomination) error`
+- `SetAdditionalServices(ctx, nominationID, serviceKeys []string) error` — delete existing rows then insert new ones in a transaction
 - `AddDocument(ctx, doc) error`
 - `FindDocumentsByNominationID(ctx, nominationID) ([]NominationDocument, error)`
 
@@ -142,22 +161,28 @@ Request body:
   "cargo_quantity": 0.0,
   "charterer": "",
   "estimated_barge_count": 0,
-  "nomor_pkk": ""
+  "nomor_pkk": "",
+  "additional_services": ["TANK_CLEANING", "SUPPLY_LOGISTIC"]
 }
 ```
 
+`additional_services` adalah array string service keys. Boleh kosong `[]` atau tidak dikirim (dianggap `[]`).
+
 **If action = "draft":**
 1. Create nomination with `status = DRAFT`, no nomination number.
-2. Return 201 with nomination ID.
+2. Call `SetAdditionalServices(ctx, nominationID, req.AdditionalServices)`.
+3. Return 201 with nomination ID.
 
 **If action = "submit":**
 1. Validate all fields are present and valid (ETA must be future).
 2. Check all 3 document types uploaded for this nomination.
 3. Check `nomor_pkk` is not empty.
-4. Generate nomination number.
-5. Set `status = SUBMITTED`, `submitted_at = now()`.
-6. Async: call STS Platform API (Step 5).
-7. Return 201 with nomination ID and nomination number.
+4. Validate each entry in `additional_services` is a known service key; return 400 if unknown key found.
+5. Call `SetAdditionalServices(ctx, nominationID, req.AdditionalServices)`.
+6. Generate nomination number.
+7. Set `status = SUBMITTED`, `submitted_at = now()`.
+8. Async: call STS Platform API (Step 5).
+9. Return 201 with nomination ID and nomination number.
 
 ### GET /api/customer/nominations
 Returns all nominations for authenticated customer ordered by `created_at DESC`.
@@ -233,6 +258,7 @@ Body:
   "charterer": "",
   "estimated_barge_count": 0,
   "nomor_pkk": "",
+  "additional_services": ["TANK_CLEANING", "SUPPLY_LOGISTIC"],
   "documents": [
     { "type": "RENCANA_KERJA", "url": "..." },
     { "type": "SHIPPING_INSTRUCTION", "url": "..." },
@@ -241,6 +267,8 @@ Body:
   "submitted_at": "ISO-8601"
 }
 ```
+
+`additional_services`: array service keys. Kirim `[]` jika tidak ada yang dipilih.
 
 On success: update `nominations.status = PENDING`, store `sts_nomination_id` from response.
 On all retries fail: update `nominations.status = SUBMIT_FAILED`; log error.
@@ -264,6 +292,23 @@ Use shadcn/ui `Form` with `react-hook-form` + `zod` for validation.
 - Charterer: text input, required on submit
 - Estimasi Jumlah Barge: integer input, min 1, required on submit
 - Nomor PKK: text input, required on submit
+
+**Additional Service section** (below main fields, above documents):
+
+Render as a labeled checkbox group titled "Additional Service (Opsional)". Each checkbox maps service key → label:
+```
+TANK_CLEANING              → Tank Cleaning
+BUNKERING_FRESHWATER       → Pengisian Bahan Bakar atau Air Bersih (Bunkering & Fresh Water Supplying)
+SHORT_STAY_TEMPORARY       → Short Stay Temporary
+SUPPLY_LOGISTIC            → Supply Logistic
+LAY_UP                     → Lay Up
+SHIP_CHANDLER              → Ship Chandler
+KAPAL_EMERGENCY            → Kapal Emergency
+```
+- All unchecked by default on new form.
+- Preserve checked state when re-loading a Draft (fetch from `nomination.additional_services`).
+- No validation required — field is fully optional.
+- On "Simpan Draft" or "Submit Nominasi": include `additional_services: string[]` in the request body (checked keys only; send `[]` if none checked).
 
 **Document upload section** (one card per document type):
 - Rencana Kerja
@@ -312,6 +357,11 @@ After successful submit:
 - [ ] Customer can save form as Draft at any point without validation errors
 - [ ] Draft appears in nomination list with status "Draft"
 - [ ] Customer can re-open and edit draft
+- [ ] Additional Service section shows 7 checkboxes with correct labels
+- [ ] Customer can check zero, one, or multiple Additional Services
+- [ ] Additional Service selection is preserved when re-opening a Draft
+- [ ] Additional Service selection is included in STS Platform payload as `additional_services` array
+- [ ] If no Additional Service selected, `additional_services: []` is sent (not null)
 - [ ] Each document card shows two tabs: "Upload Baru" and "Pilih dari Document Master"
 - [ ] "Upload Baru": file picker works; PDF/JPG/PNG enforced; max 10MB enforced
 - [ ] "Upload Baru": on success, file is saved to Document Master AND attached to nomination
