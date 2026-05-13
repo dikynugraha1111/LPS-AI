@@ -17,6 +17,23 @@ The data flow is:
 - M9 complete: `nomination_epb`, `nomination_status_history` tables; STS webhook APPROVED handler berfungsi dan otomatis membuat row `epb_payments` (status `UNPAID`) untuk setiap nominasi yang disetujui.
 - Env vars (same as M9): `STS_WEBHOOK_SECRET`, `STS_API_KEY`, `STS_PLATFORM_BASE_URL`
 
+## Prerequisites — Design Reference (WAJIB)
+
+Sebelum menulis UI apapun, **wajib** baca dua file ini:
+
+1. **Design system master:** [`implementation/design/lps-design-system.md`](../design/lps-design-system.md) — foundation tokens, component library, surface preset.
+2. **Per-modul UI design:** [`implementation/design/m9b-epb-invoice-ui.md`](../design/m9b-epb-invoice-ui.md) — list page tabs filter, detail page 2-column, status banner per 4 payment status, bank account card, payment history pattern.
+
+**Surface:** A — Customer Portal (Bahasa Indonesia).
+
+**UI rules ringkas:**
+- Tabs filter underline style untuk list (Semua/Unpaid/Menunggu Verifikasi/Reject/Paid).
+- Status badge per row & banner: variant sesuai 4 status (UNPAID Neutral uppercase, WAITING_PAYMENT_VERIFICATION Pending verify, PAYMENT_REJECT Error, PAID Confirmed).
+- Bank account card dengan tombol copy-to-clipboard (toast confirm).
+- Payment history: nested card per attempt dengan reason saat reject.
+- File upload dropzone: lihat design system §3.2.
+- Color primer: navy `#0F2A4D`. Canvas `bg-slate-50`. Font Inter.
+
 ## Tech Stack
 - **Frontend:** React 19, Vite, TailwindCSS v4, shadcn/ui, wouter, TanStack React Query
 - **Backend:** Go 1.25, jasoet/pkg/v2 (Echo, GORM, zerolog)

@@ -111,6 +111,48 @@ Folder `document/brd/` berisi satu file per modul (M1–M12) yang dipecah dari B
 
 ---
 
+## UI/UX Standard — WAJIB untuk semua kerja UI
+
+LPS Platform punya **design system terpusat** yang menjadi single source of truth untuk semua UI work (baru, edit, refactor).
+
+**Master file:** `implementation/design/lps-design-system.md`
+
+**Aturan WAJIB:**
+
+1. **Sebelum menulis/mengedit UI apapun** (komponen, halaman, layout, copy, status badge), AI agent **WAJIB**:
+   - Baca `implementation/design/lps-design-system.md` (foundation + dua surface preset)
+   - Baca per-modul design doc terkait: `implementation/design/m<N>-<name>-ui.md`
+   - Invoke skill `ui-ux-pro-max` untuk validasi atau generate komponen (terutama untuk halaman baru, komponen kompleks, atau ketika design system belum mencover pattern yang dibutuhkan)
+
+2. **Surface system** — LPS Platform punya dua surface UI berbeda:
+   - **Surface A — Customer Portal** (M7 customer side, M8, M9, M9b, M10): Bahasa Indonesia, sidebar simpel, card-heavy.
+   - **Surface B — Internal Operator** (M7 admin side, M11, M12): English, sidebar nested collapsible, top bar persistent, data-dense.
+   - Setiap modul harus pakai surface yang sesuai sesuai mapping di design system §1.
+
+3. **Status badge** — wajib pakai variant dari `Status palette` di design system §2.1. Mapping label business → variant ada di tabel `Status mapping LPS`. Jangan bikin warna/label status baru tanpa update design system.
+
+4. **Tech stack UI yang sudah disepakati:**
+   - React 19 + Vite + TailwindCSS v4
+   - shadcn/ui sebagai komponen basis
+   - Lucide React untuk icon
+   - Recharts untuk chart
+   - Leaflet + OpenStreetMap untuk map
+   - Framer Motion untuk animasi
+   - Inter sebagai font family
+
+5. **Per-modul UI design doc** — setiap modul yang punya UI wajib punya file `implementation/design/m<N>-<name>-ui.md` yang berisi: page inventory, layout per page, komponen dipakai, state transitions, copy reference. File ini dirujuk dari `module/<name>/README.md` dan `implementation/replit-handoff/m<N>-*.md`.
+
+6. **Saat ada pattern UI baru** yang belum tercover:
+   - Tambahkan ke `lps-design-system.md` lebih dulu (jadi reusable pattern)
+   - Baru pakai di per-modul design doc
+   - Update changelog di design system
+
+7. **Replit handoff** wajib punya section "Prerequisites — Design Reference" di awal yang menginstruksikan Replit Agent membaca design system + per-modul design doc sebelum scaffold UI.
+
+**Rationale:** Mencegah drift visual antar modul, mempercepat hand-off ke Replit Agent, memastikan brand konsisten (Professional Maritime style), dan menjamin produksi UI sesuai pattern yang sudah live.
+
+---
+
 ## Placement Rules (Where New Content Goes)
 
 | Content Type | Location |
@@ -118,6 +160,8 @@ Folder `document/brd/` berisi satu file per modul (M1–M12) yang dipecah dari B
 | Business/system requirements, ground truth | `document/` |
 | Module scoping (requirements, specs, stories) | `module/<submodule>/` (4-file rule) |
 | Architecture, diagrams, data models, API design | `implementation/design/` |
+| UI/UX design system (master) | `implementation/design/lps-design-system.md` |
+| UI/UX per modul | `implementation/design/m<N>-<name>-ui.md` |
 | Step-by-step per-module plans | `implementation/plan/<module>/` |
 | Final Replit Agent execution prompts | `implementation/replit-handoff/<module>/` |
 

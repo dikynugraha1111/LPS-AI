@@ -9,6 +9,26 @@ Continuation of the LPS Customer Portal. **Module 10** provides the customer lan
 - LPS AIS data available at internal endpoint (see Step 4).
 - Env var: `LPS_INTERNAL_API_KEY` for accessing internal LPS services.
 
+## Prerequisites — Design Reference (WAJIB)
+
+Sebelum menulis UI apapun, **wajib** baca dua file ini:
+
+1. **Design system master:** [`implementation/design/lps-design-system.md`](../design/lps-design-system.md) — foundation tokens, component library, surface preset, pattern map widget & chart Recharts.
+2. **Per-modul UI design:** [`implementation/design/m10-customer-dashboard-ui.md`](../design/m10-customer-dashboard-ui.md) — 5 halaman (Dashboard, Nominasi list, Voyage tracking, Document Master, Cuaca & Alert), referensi langsung dari production screenshot.
+
+**Surface:** A — Customer Portal (Bahasa Indonesia).
+
+**UI rules ringkas:**
+- Dashboard layout sesuai screenshot production: 3 section card stacked (Nominasi Aktif → Voyage Aktif → Cuaca Saat Ini).
+- Voyage card pattern nested di Dashboard (lihat design system §3.2).
+- Metric tile 3-column untuk weather widget (icon + label uppercase + value besar + sub-value).
+- Map widget: Leaflet + OpenStreetMap, custom vessel marker (Lucide Navigation rotated by heading), legend overlay kiri-bawah.
+- Document Master: append-only — TIDAK ada tombol delete/edit.
+- Severity Warning badge: uppercase bold yellow (`bg-yellow-50 border-yellow-300 text-yellow-800`).
+- Chart (jika dipakai): Recharts dengan threshold coloring (green/yellow/red).
+- Tabs underline untuk Nominasi list (Semua/Aktif/Draft/Selesai).
+- Color primer: navy `#0F2A4D`. Canvas `bg-slate-50`. Font Inter.
+
 ## Tech Stack
 - **Frontend:** React 19, Vite, TailwindCSS v4, shadcn/ui, Recharts (charts), Framer Motion (animations), wouter, TanStack React Query
 - **Backend:** Go 1.25, jasoet/pkg/v2 (Echo, GORM, zerolog)

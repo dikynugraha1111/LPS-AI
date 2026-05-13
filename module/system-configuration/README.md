@@ -70,3 +70,15 @@ M12 menyediakan konfigurasi untuk:
 | [requirements.md](requirements.md) | Functional requirements FR-SC-01 s/d FR-SC-06 |
 | [specifications.md](specifications.md) | Spesifikasi teknis: DB schema, API endpoints, business rules |
 | [user-stories.md](user-stories.md) | User stories US-SC-01 s/d US-SC-05 |
+
+---
+
+## UI/UX Design
+
+**Surface B — Internal Operator** (English). Modul ini berada di area Settings dari sidebar Operator dengan sub-navigation nested.
+
+**Reference wajib sebelum kerja UI:**
+- Foundation & komponen: [`implementation/design/lps-design-system.md`](../../implementation/design/lps-design-system.md)
+- Per-modul UI design: [`implementation/design/m12-system-configuration-ui.md`](../../implementation/design/m12-system-configuration-ui.md)
+
+Setiap kerja UI di modul ini wajib invoke skill `ui-ux-pro-max` untuk validasi/generate komponen.

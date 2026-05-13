@@ -41,3 +41,15 @@ A dedicated menu within the LPS Customer Portal untuk mengelola seluruh siklus p
 - Setelah customer upload proof: `epb_payments.status` → `WAITING_PAYMENT_VERIFICATION` DAN `nominations.status` → `WAITING_PAYMENT_VERIFICATION` (diupdate oleh M9b backend secara bersamaan).
 - LPS does **not** verify payments. All verification decisions come from STS Platform via webhook.
 - STS Platform webhook events handled here: `EPB_PAYMENT_REJECT`, `EPB_PAID`. (`EPB_PENDING_REVIEW` tidak dibutuhkan — M9b sendiri yang set `WAITING_PAYMENT_VERIFICATION` saat proof diupload.)
+
+---
+
+## UI/UX Design
+
+**Surface A — Customer Portal** (Bahasa Indonesia).
+
+**Reference wajib sebelum kerja UI:**
+- Foundation & komponen: [`implementation/design/lps-design-system.md`](../../implementation/design/lps-design-system.md)
+- Per-modul UI design: [`implementation/design/m9b-epb-invoice-ui.md`](../../implementation/design/m9b-epb-invoice-ui.md)
+
+Setiap kerja UI di modul ini wajib invoke skill `ui-ux-pro-max` untuk validasi/generate komponen.

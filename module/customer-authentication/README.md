@@ -31,3 +31,17 @@ Entry point for all Customer Portal functionality. Handles self-registration, ad
 - STS Platform sync is triggered only after Admin activation, not at registration time.
 - Customer role (`customer`) is distinct from all internal LPS operator roles.
 - Failed STS sync does not block account activation — failure is logged and retried (max 3×, exponential backoff).
+
+---
+
+## UI/UX Design
+
+M7 punya **dua surface**:
+- **Surface A — Customer Portal** (Bahasa Indonesia): customer registration, login, register success.
+- **Surface B — Internal Operator** (English): admin login, Customer Management list, customer detail (approve/reject), Add Customer manual.
+
+**Reference wajib sebelum kerja UI:**
+- Foundation & komponen: [`implementation/design/lps-design-system.md`](../../implementation/design/lps-design-system.md)
+- Per-modul UI design: [`implementation/design/m7-customer-authentication-ui.md`](../../implementation/design/m7-customer-authentication-ui.md)
+
+Setiap kerja UI di modul ini wajib invoke skill `ui-ux-pro-max` untuk validasi/generate komponen.

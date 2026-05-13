@@ -1,4 +1,64 @@
 
+## 2026-05-13T23:00:00+07:00
+- **Task Performed:** Update design system ke v1.1 dan M7 UI doc untuk pattern login customer yang baru (split-screen + image showcase carousel). Dipicu oleh screenshot login baru dari user dengan layout split-screen (form kiri + image kapal kanan + carousel dots + caption "Keselamatan & Keandalan").
+- **Files Modified:**
+  - `implementation/design/lps-design-system.md` — bump ke v1.1. Tambah: (1) section 2.10 "Brand mark" dengan dua varian (wordmark inline + stacked) + canonical naming "LPS System"; (2) Input with leading icon pattern di §3.1 (Mail icon kiri untuk email, Lock + eye toggle untuk password, background subtle `bg-slate-50/60`); (3) Divider with text pattern; (4) Auth Split-Screen layout di §3.4 (50/50 split, brand mark top-left, form centered vertikal max-w-md, image showcase kanan, breakpoint lg); (5) Image Showcase Carousel pattern dengan caption overlay bottom-left + dots indicator bottom-right; (6) 3 default slides Surface A (Keselamatan & Keandalan, Integrasi STS Real-time, Pantauan 24/7) verbatim; (7) Auth Centered layout untuk admin login (minimal, no showcase). Changelog v1.1 ditambah.
+  - `implementation/design/m7-customer-authentication-ui.md` — header bump v1.1. Section 3.1 Customer Login rewrite total: ganti centered card → Auth Split-Screen. Heading diubah dari "Portal Pelanggan LPS" → "Selamat Datang" (sesuai screenshot). Field pattern diganti ke Input with leading icon. Tambah divider "atau" + link "Daftar di sini" bold. Footer copy verbatim dari screenshot. Section 3.2 Customer Register: tambah catatan layout (split-screen sama dengan login, form panel scrollable, max-w-xl, image showcase tetap fixed). Heading register: "Daftar Akun Pelanggan". Section 4.1 Admin Login: pakai Auth Centered layout dengan brand mark stacked, English copy, no showcase. Section 5 Component Usage Summary diupdate dengan 4 komponen baru.
+  - `implementation/replit-handoff/m7-customer-authentication.md` — section "Prerequisites — Design Reference (WAJIB)" diupdate. Tambah tabel layout pattern per halaman auth (split-screen vs centered). Tambah "Required komponen baru (v1.1)" yang menyebut Input with leading icon, Image Showcase Carousel, Brand mark wordmark inline, Divider with text. Heading + footer copy verbatim per halaman.
+- **Logic / Decisions Made:**
+  - **Customer login pakai Auth Split-Screen** sesuai screenshot, customer register juga (konsisten visual). Admin login tetap Auth Centered karena halaman fungsional internal — marketing showcase tidak relevan.
+  - **Carousel 3 default slides** ditambahkan ke design system sebagai tabel referensi (bukan hanya placeholder). Konten: Keselamatan & Keandalan (verbatim dari screenshot), Integrasi STS Real-time, Pantauan 24/7. Disimpan sebagai config di `src/config/authSlides.ts` agar mudah di-update tanpa rebuild design.
+  - **Input with leading icon ditambahkan sebagai pattern terpisah** di §3.1 — beda dari Input base (background tinted `bg-slate-50/60`, padding lebih besar `py-3`, icon absolute kiri). Ini pattern khusus auth, bukan untuk form dalam app yang pakai Input base.
+  - **Brand mark wordmark inline** (anchor + "LPS System") ditegaskan sebagai canonical untuk halaman auth. Brand mark stacked (Ship + brand 2-line) untuk sidebar. Sebelumnya design system belum dokumentasikan dua varian eksplisit.
+  - **Canonical naming "LPS System"** untuk display — bukan "LPS Platform" (yang hanya untuk dokumentasi internal/BRD). Konsisten dengan screenshot.
+  - **Form register tetap pakai split-screen** meski lebih panjang dari login: form panel scrollable, image showcase kanan fixed. Form max-w-md → max-w-xl untuk register (field tidak terlalu sempit).
+  - **Modul lain tidak perlu update** karena perubahan ini terbatas di pattern auth (M7 only). Modul M8/M9/M9b/M10/M12 tidak punya halaman auth.
+- **Results / Next Steps:**
+  - Design system kini punya pattern auth eksplisit (split-screen + carousel + centered) yang dipisahkan dari layout app utama.
+  - M7 implementation handoff sekarang lebih akurat — Replit Agent bisa langsung implement login dengan pattern yang match production.
+  - Jika ada modul auth baru di masa depan (mis. password reset, 2FA setup), pattern yang sama bisa direuse dari design system §3.4.
+
+## 2026-05-13T22:00:00+07:00
+- **Task Performed:** Integrasi skill ui-ux-pro-max ke seluruh pipeline dokumentasi LPS. Bikin design system terpusat (Professional Maritime style) + per-modul UI design doc untuk 6 modul, tambah policy di CLAUDE.md & README.md, dan update 6 replit-handoff dengan section "Prerequisites — Design Reference". Style + komponen disesuaikan dengan 7 screenshot production yang diberikan user (Customer Portal Surface A + LPS System Bunati Port Surface B).
+- **Files Modified:**
+  - `implementation/design/lps-design-system.md` — **file baru**: master design system 7 section (Foundation, dua Surface preset, Component Library lengkap dengan Tailwind class snippets, Responsive strategy, DoD, Cross-refs, Changelog). Status palette mapping verbatim ke status business LPS (Menunggu Review, Disetujui, Perlu Revisi, Menunggu Verifikasi Pembayaran, Pembayaran Dikonfirmasi, UNPAID, Draft, WARNING).
+  - `implementation/design/m7-customer-authentication-ui.md` — **file baru**: dual surface (A customer register/login + B admin Customer Management/detail/Add).
+  - `implementation/design/m8-nomination-submission-ui.md` — **file baru**: form 5 section (Kapal, Voyage, Cargo, Additional Service 7 checkbox, Dokumen Pendukung dual-tab).
+  - `implementation/design/m9-nomination-status-payment-ui.md` — **file baru**: detail page 2-column, status banner 6 varian (Draft/Submitted/Approved/Need Revision/Waiting Verification/Confirmed), timeline custom, EPB Detail section.
+  - `implementation/design/m9b-epb-invoice-ui.md` — **file baru**: list page 5 tabs filter, detail 2-column, status banner 4 payment status, bank account card dengan copy clipboard, payment history nested.
+  - `implementation/design/m10-customer-dashboard-ui.md` — **file baru**: 5 halaman (Dashboard, Nominasi list, Voyage tracking dengan Leaflet, Document Master append-only, Cuaca & Alert) — layout langsung disalin dari production screenshot.
+  - `implementation/design/m12-system-configuration-ui.md` — **file baru**: Surface B operator, 9 halaman settings (Overview, Users, Roles matrix, System Config tabs, API Integrations, Equipment, Audit Log immutable, STS Sync dengan Recharts).
+  - `CLAUDE.md` — tambah section "UI/UX Standard — WAJIB untuk semua kerja UI" (7 aturan: baca design system + invoke ui-ux-pro-max + dua surface mapping + status badge variant + tech stack + per-modul design doc + saat ada pattern baru + replit handoff Prerequisites). Tambah Placement Rules row.
+  - `README.md` — tambah section design system di `/implementation/design/` description + aturan ringkas UI/UX.
+  - `module/customer-authentication/README.md` — append section "UI/UX Design" dengan link ke design system + m7-ui doc + surface info.
+  - `module/nomination-submission/README.md` — append section UI/UX Design (Surface A).
+  - `module/nomination-status-payment/README.md` — append section UI/UX Design (Surface A).
+  - `module/epb-invoice/README.md` — append section UI/UX Design (Surface A).
+  - `module/customer-dashboard-monitoring/README.md` — append section UI/UX Design (Surface A).
+  - `module/system-configuration/README.md` — append section UI/UX Design (Surface B).
+  - `implementation/replit-handoff/m7-customer-authentication.md` — tambah section "Prerequisites — Design Reference (WAJIB)" sebelum Tech Stack, instruksi baca 2 file (design system + m7-ui), surface mapping dual, UI rules ringkas (shadcn, status badge variant, color tokens, card pattern, font, icon).
+  - `implementation/replit-handoff/m8-nomination-submission.md` — tambah section Prerequisites Design Reference Surface A.
+  - `implementation/replit-handoff/m9-nomination-status-payment.md` — tambah section Prerequisites Design Reference Surface A dengan emphasis status banner & timeline.
+  - `implementation/replit-handoff/m9b-epb-invoice.md` — tambah section Prerequisites Design Reference Surface A dengan emphasis 4 payment status & bank account card.
+  - `implementation/replit-handoff/m10-customer-dashboard-monitoring.md` — tambah section Prerequisites Design Reference Surface A dengan emphasis Leaflet map + Recharts + Document Master append-only.
+  - `implementation/replit-handoff/m12-system-configuration.md` — tambah section Prerequisites Design Reference Surface B dengan emphasis sidebar nested, top bar, permission-based rendering, immutable audit log.
+- **Logic / Decisions Made:**
+  - **Dua surface system**, bukan satu — observasi dari 7 screenshot: Customer Portal (Surface A, ID, sidebar simpel, card-heavy, no top bar) berbeda jelas dengan LPS System Bunati Port (Surface B, EN, sidebar nested collapsible, top bar persistent dengan search/datetime/notifications/profile, data-dense KPI+map+chart). Design system mendefinisikan keduanya sebagai preset turunan dari Foundation yang sama.
+  - **Modul M7 unik karena dual-surface**: customer side (register/login) pakai Surface A, admin side (Customer Management) pakai Surface B. m7-customer-authentication-ui.md dibagi 2 section eksplisit.
+  - **Style line:** Professional Maritime — minimalism + flat dengan jangkar navy `#0B2545`/`#0F2A4D` (sidebar, primary), canvas `bg-slate-50`, card `bg-white rounded-2xl shadow-sm`. TIDAK pakai glassmorphism, gradient besar, atau heavy shadow.
+  - **Status badge wajib soft pill pattern** (50/200/700 dengan border halus) — bukan solid color. Mapping label business ke variant didefinisikan eksplisit di design system §2.1 sehingga konsisten lintas modul.
+  - **Surface B chart:** Recharts dengan threshold coloring (green safe / yellow warning / red danger) sesuai screenshot weather forecast. Map: Leaflet + OpenStreetMap dengan custom marker (Lucide Navigation rotated untuk vessel, Anchor untuk anchor point).
+  - **Policy enforcement triple-layer** (sesuai pilihan user): CLAUDE.md (project-level rule wajib) + README.md (navigasi + ringkas) + module/<name>/README.md (per-modul pointer). Mencegah agent skip baca design system di pekerjaan UI ke depan.
+  - **Replit handoff Prerequisites:** Section disisipkan SEBELUM Tech Stack agar urutan baca natural — design reference dulu, baru tech stack, baru step-by-step. Link relatif ke design doc (`../design/...`).
+  - **4-file rule module/ intact:** Semua perubahan di module/<name>/ hanya append section ke file README.md yang sudah ada — tidak menambah file baru. Sudah diverify dengan `ls`.
+  - **Tidak meng-update file existing `2026-04-25-module7-decomposition-design.md`** karena itu design decomposition (bukan UI design) dengan scope berbeda.
+  - **Modul yang dikerjakan: hanya yang punya module/ folder** sesuai pilihan user — M7, M8, M9, M9b, M10, M12. M11 (Monitoring Dashboard internal) belum punya module/ folder jadi di-skip; jika dikerjakan, surface-nya akan Surface B juga.
+- **Results / Next Steps:**
+  - LPS Platform sekarang punya design system terpusat yang siap pakai. Total 7 file design baru + 9 file existing diupdate = 16 file modified.
+  - Setiap AI agent / Replit Agent yang melanjutkan kerja UI akan menemukan design reference yang clear di 3 titik: project CLAUDE.md, module README, dan replit handoff Prerequisites.
+  - Tidak ada konflik dengan pipeline existing — semua modul yang sudah punya replit-handoff tetap valid; section Prerequisites baru bersifat additive.
+  - **Saat M11 atau modul UI baru ditambahkan ke pipeline:** bikin `implementation/design/m<N>-<name>-ui.md` baru mengikuti struktur sama (Ringkasan, Page Inventory, halaman per route, Component Usage, Edge Cases, Cross-refs), update Changelog di lps-design-system.md jika ada pattern baru.
+
 ## 2026-05-11T02:00:00+07:00
 - **Task Performed:** Jalankan implementation pipeline M12 — System Configuration. Buat 4 file module/ dan 1 file replit-handoff dari nol, menggunakan BRD M12 sebagai scope aktif dan old-data (Master Data lama) sebagai referensi implementasi yang sudah berjalan.
 - **Files Modified:**

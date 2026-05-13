@@ -110,6 +110,13 @@ When executing any task, follow this loop:
 **Contains:**
 - Architecture decisions, diagrams, UX flows, API design notes, data model sketches
 - Any design artifacts that translate module specs into an implementable design
+- **`lps-design-system.md`** — UI/UX **single source of truth** (foundation tokens, color/typography/spacing, status palette, component library, dua surface preset: Customer Portal & Internal Operator). **WAJIB dibaca sebelum pekerjaan UI apapun.**
+- **`m<N>-<name>-ui.md`** — per-modul UI design doc (page inventory, layout, komponen, state transitions, copy reference). Setiap modul yang punya UI wajib punya file ini.
+
+**Aturan UI/UX (wajib):**
+- Setiap kerja UI (baru, edit, refactor) **wajib** baca `lps-design-system.md` dulu, lalu invoke skill `ui-ux-pro-max` untuk validasi/generate komponen.
+- Surface mapping: M7 (customer side), M8, M9, M9b, M10 → Surface A (Customer Portal, Bahasa Indonesia). M7 (admin side), M12 → Surface B (Internal Operator, English).
+- Detail kebijakan ada di `CLAUDE.md` section "UI/UX Standard".
 
 #### `/implementation/plan/` — Implementation Plans & Brainstorming
 **Contains:**

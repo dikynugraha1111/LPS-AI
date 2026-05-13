@@ -7,6 +7,23 @@ Continuation of the LPS Customer Portal. **Module 8** handles nomination creatio
 - M7 is complete: `customers` table exists, JWT auth middleware works, `/api/auth/customer/login` returns valid JWT.
 - Customer is authenticated via JWT middleware (role = `customer`).
 
+## Prerequisites — Design Reference (WAJIB)
+
+Sebelum menulis UI apapun, **wajib** baca dua file ini:
+
+1. **Design system master:** [`implementation/design/lps-design-system.md`](../design/lps-design-system.md) — foundation tokens, component library, surface preset.
+2. **Per-modul UI design:** [`implementation/design/m8-nomination-submission-ui.md`](../design/m8-nomination-submission-ui.md) — form layout 5 sections, tabs dokumen, Additional Service checkbox, copy reference.
+
+**Surface:** A — Customer Portal (Bahasa Indonesia).
+
+**UI rules ringkas:**
+- Pakai shadcn/ui basis komponen. Styling via Tailwind dari design system.
+- Section Card: `rounded-2xl border border-slate-200 bg-white p-8 shadow-sm` untuk setiap section form.
+- Tabs underline style untuk Dokumen Pendukung (Upload Baru / Document Master).
+- File upload dropzone: lihat design system §3.2 untuk full pattern.
+- Status badge: gunakan variant dari design system §2.1 (Draft = Neutral italic).
+- Color primer: navy `#0F2A4D`. Canvas `bg-slate-50`. Font Inter.
+
 ## Tech Stack
 - **Frontend:** React 19, Vite, TailwindCSS v4, shadcn/ui, wouter, TanStack React Query
 - **Backend:** Go 1.25, jasoet/pkg/v2 (Echo, GORM, zerolog)

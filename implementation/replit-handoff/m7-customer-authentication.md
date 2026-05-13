@@ -13,6 +13,46 @@ Customers are companies (Cargo Owner, Shipper, PBM, Agen, Surveyor, Vendor Dozer
 
 Admin can also add customers directly from the Admin Dashboard (bypassing the self-registration flow), and may attach custom documents beyond the 3 standard ones.
 
+## Prerequisites — Design Reference (WAJIB)
+
+Sebelum menulis UI apapun, **wajib** baca dua file ini:
+
+1. **Design system master:** [`implementation/design/lps-design-system.md`](../design/lps-design-system.md) — foundation tokens (warna, typography, spacing, radius, shadow), component library, dua surface preset.
+2. **Per-modul UI design:** [`implementation/design/m7-customer-authentication-ui.md`](../design/m7-customer-authentication-ui.md) — page inventory, layout per page, komponen, copy reference.
+
+**Surface mapping M7:**
+- **Surface A — Customer Portal** (Bahasa Indonesia): customer register, login, register success.
+- **Surface B — Internal Operator** (English): admin login, Customer Management list, customer detail (approve/reject), Add Customer manual.
+
+**Layout pattern per halaman auth (PENTING — dari design system v1.1):**
+
+| Halaman | Layout | Catatan |
+|---|---|---|
+| `/customer/login` | **Auth Split-Screen** (design system §3.4) | Form panel kiri 50% + Image Showcase Carousel kanan 50%. Pada `<lg` image hidden. |
+| `/customer/register` | **Auth Split-Screen** | Sama dengan login. Form panel scrollable (form lebih panjang), image showcase fixed. `max-w-xl` untuk form (vs `max-w-md` di login). |
+| `/customer/register/success` | **Auth Centered** | Simple confirmation card. |
+| `/admin/login` | **Auth Centered** | Minimal, no showcase. English copy. Token di HTTP-only cookie. |
+| Halaman admin lain | Sidebar B + Top bar B layout | Standard operator layout. |
+
+**Required komponen baru (v1.1):**
+- **Input with leading icon** (design system §3.1) — wajib untuk email & password fields di semua auth pages. Icon kiri `Mail` / `Lock`, eye toggle kanan untuk password.
+- **Image Showcase Carousel** (design system §3.4) — 3 default slides Surface A (lihat tabel di design system). Auto-advance 6 detik, pause on hover. Images di `public/images/auth-showcase/`, config di `src/config/authSlides.ts`.
+- **Brand mark wordmark inline** (design system §2.10) — anchor icon + "LPS System" di top-left auth pages. BUKAN brand stacked.
+- **Divider with text** (design system §3.1) — untuk "atau" di customer login.
+
+**UI rules ringkas:**
+- shadcn/ui sebagai basis komponen; styling via Tailwind class dari design system.
+- Heading customer login: "Selamat Datang" `text-4xl font-semibold`. Subtitle: "Masuk ke Portal Pelanggan LPS".
+- Heading customer register: "Daftar Akun Pelanggan". Subtitle: "Lengkapi data perusahaan dan unggah dokumen wajib."
+- Heading admin login: "Sign In". Subtitle: "Operations console — Bunati Port".
+- Status badge: variant dari design system §2.1 (soft pill 50/200/700 dengan border).
+- Color primer: navy `#0F2A4D` (sidebar, primary button), canvas `bg-slate-50`, card `bg-white`, border `border-slate-200`.
+- Card: `rounded-2xl border border-slate-200 bg-white p-8 shadow-sm`.
+- Font: Inter. Heading semibold (600).
+- Icon: Lucide React.
+- Footer copy customer auth: "© 2026 LPS System. Seluruh hak dilindungi." (ID).
+- Footer copy admin login: "© 2026 LPS System" (EN).
+
 ## Tech Stack
 - **Frontend:** React 19, Vite, TailwindCSS v4, shadcn/ui, wouter (routing), TanStack React Query
 - **Backend:** Go 1.25, jasoet/pkg/v2 (Echo framework, GORM ORM, zerolog logger, config)

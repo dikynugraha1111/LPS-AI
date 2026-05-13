@@ -10,6 +10,28 @@ Modul ini mengelola konfigurasi sistem LPS: user & role management, system param
 - Tabel `admin_users` atau setaranya sudah ada (dari implementasi admin sebelumnya).
 - Identifikasi tabel dan struktur yang sudah ada sebelum menjalankan migration.
 
+## Prerequisites — Design Reference (WAJIB)
+
+Sebelum menulis UI apapun, **wajib** baca dua file ini:
+
+1. **Design system master:** [`implementation/design/lps-design-system.md`](../design/lps-design-system.md) — foundation tokens, component library, dua surface preset.
+2. **Per-modul UI design:** [`implementation/design/m12-system-configuration-ui.md`](../design/m12-system-configuration-ui.md) — Settings overview cards grid, sub-navigation, 7 halaman (Users, Roles, System Config, Integrations, Equipment, Audit Log, STS Sync).
+
+**Surface:** B — Internal Operator (English). Modul ini bagian dari sidebar Operator section SETTINGS dengan sub-navigation nested.
+
+**UI rules ringkas:**
+- Sidebar B (nested collapsible) dengan SETTINGS expanded saat di area ini.
+- Top bar B persistent (search, datetime, notifications, user profile, logout).
+- Sub-item sidebar level 2: UPPERCASE letter-spaced, indented.
+- KPI Card pattern untuk Settings overview & STS Sync dashboard.
+- Table pattern dengan filter bar di atas, pagination di bawah.
+- Status badge: variant dari design system §2.1 — Active (Success), Disabled (Neutral), Pending Review (Info), Rejected (Error).
+- Permission-based rendering: hide nav item jika user role tidak punya akses.
+- Audit Log: immutable, no edit/delete actions, only view + export.
+- Sticky action bar di bottom untuk unsaved changes (Roles matrix).
+- Chart (STS Sync history): Recharts bar.
+- Color primer: navy `#0F2A4D`. Canvas `bg-slate-50`. Font Inter.
+
 ## Tech Stack
 
 - **Frontend:** React 19, Vite, TailwindCSS v4, shadcn/ui, wouter, TanStack React Query

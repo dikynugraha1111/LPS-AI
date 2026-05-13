@@ -34,3 +34,15 @@ None — this is a terminal read-only module.
 - Weather data shown to customers is the same data as the operator view but limited to current conditions and the last 24h of alerts.
 - Customer sees only their own nominations and voyages — no cross-customer data.
 - **Status scope (BRD v3.1):** M10 membaca `nominations.status` yang mencerminkan state pembayaran secara paralel: `APPROVED` (belum bayar), `WAITING_PAYMENT_VERIFICATION` (sudah upload proof), `PAYMENT_CONFIRMED` (lunas). Detail payment (proof history, rejection reason) ada di `epb_payments` (M9b).
+
+---
+
+## UI/UX Design
+
+**Surface A — Customer Portal** (Bahasa Indonesia).
+
+**Reference wajib sebelum kerja UI:**
+- Foundation & komponen: [`implementation/design/lps-design-system.md`](../../implementation/design/lps-design-system.md)
+- Per-modul UI design: [`implementation/design/m10-customer-dashboard-ui.md`](../../implementation/design/m10-customer-dashboard-ui.md)
+
+Setiap kerja UI di modul ini wajib invoke skill `ui-ux-pro-max` untuk validasi/generate komponen.

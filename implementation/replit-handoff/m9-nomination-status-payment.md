@@ -14,6 +14,22 @@ Continuation of the LPS Customer Portal. **Module 9** handles everything after a
 - STS Platform webhook URL must be registered with STS team: `POST https://<lps-domain>/api/webhooks/sts/nomination-status`
 - Env vars needed: `STS_WEBHOOK_SECRET` (for HMAC signature verification), `STS_API_KEY`, `STS_PLATFORM_BASE_URL`
 
+## Prerequisites — Design Reference (WAJIB)
+
+Sebelum menulis UI apapun, **wajib** baca dua file ini:
+
+1. **Design system master:** [`implementation/design/lps-design-system.md`](../design/lps-design-system.md) — foundation tokens, component library, surface preset.
+2. **Per-modul UI design:** [`implementation/design/m9-nomination-status-payment-ui.md`](../design/m9-nomination-status-payment-ui.md) — detail page 2-column layout, status banner varian per status, timeline pattern, EPB detail section, action card kontextual.
+
+**Surface:** A — Customer Portal (Bahasa Indonesia).
+
+**UI rules ringkas:**
+- Status banner: pakai pattern dari design system §3.2 dengan variant sesuai status (Info/Success/Warning/Pending verify/Confirmed).
+- Status mapping label ID: lihat design system §2.1 "Status mapping LPS" (Menunggu Review, Disetujui, Perlu Revisi, Menunggu Verifikasi Pembayaran, Pembayaran Dikonfirmasi).
+- Timeline custom: vertical dot bullet + connector line, dot pulse animate untuk current step.
+- Action card kontextual: hanya tampil saat ada aksi yang bisa diambil customer.
+- Color primer: navy `#0F2A4D`. Canvas `bg-slate-50`. Font Inter.
+
 ## Tech Stack
 - **Frontend:** React 19, Vite, TailwindCSS v4, shadcn/ui, wouter, TanStack React Query
 - **Backend:** Go 1.25, jasoet/pkg/v2 (Echo, GORM, zerolog)
