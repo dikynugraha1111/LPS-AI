@@ -1,6 +1,8 @@
 # Replit Handoff — M9: Nomination Status & EPB Confirmation
 
-**Version:** 2.0 (revised per BRD v3.1 / Swimlane V3)
+**Version:** 2.1 (sync v3.3 — status labels & billing routes)
+
+> **v2.1 changes (2026-05-13):** Status labels disinkronkan ke BRD v3.3 mapping (UNPAID→Belum Dibayar, Pembayaran Dikonfirmasi→Lunas, Menunggu Verifikasi Pembayaran→Menunggu Verifikasi). Route ke M9b berubah dari `/customer/epb-invoice` → `/customer/billing/epb`. Saat insert row `epb_payments` di event APPROVED, sekarang juga set `total_amount`, `currency`, `due_date` (kolom baru di v3.3 — lihat M9b handoff v2.0).
 
 ## Context
 
@@ -25,7 +27,7 @@ Sebelum menulis UI apapun, **wajib** baca dua file ini:
 
 **UI rules ringkas:**
 - Status banner: pakai pattern dari design system §3.2 dengan variant sesuai status (Info/Success/Warning/Pending verify/Confirmed).
-- Status mapping label ID: lihat design system §2.1 "Status mapping LPS" (Menunggu Review, Disetujui, Perlu Revisi, Menunggu Verifikasi Pembayaran, Pembayaran Dikonfirmasi).
+- Status mapping label ID (v3.3 sync): lihat design system §2.1 "Status mapping LPS" (Menunggu Review, Disetujui, Perlu Revisi, **Menunggu Verifikasi**, **Lunas**). Label `UNPAID` → "Belum Dibayar"; `Pembayaran Dikonfirmasi` → "Lunas"; `Menunggu Verifikasi Pembayaran` → "Menunggu Verifikasi".
 - Timeline custom: vertical dot bullet + connector line, dot pulse animate untuk current step.
 - Action card kontextual: hanya tampil saat ada aksi yang bisa diambil customer.
 - Color primer: navy `#0F2A4D`. Canvas `bg-slate-50`. Font Inter.
@@ -239,9 +241,9 @@ Logic:
 Tidak ada endpoint backend baru di M9 untuk upload proof. M9 hanya menyediakan tombol navigasi ke M9b.
 
 Logika tampilan di `NominationStatusPage.tsx` (berdasarkan `nominations.status`):
-- Jika `status = APPROVED`: tampilkan tombol **"Bayar EPB"** → navigasi ke `/customer/epb-invoice`.
+- Jika `status = APPROVED`: tampilkan tombol **"Bayar EPB"** → navigasi ke `/customer/billing/epb`.
 - Jika `status = WAITING_PAYMENT_VERIFICATION`: sembunyikan tombol "Bayar EPB", tampilkan info banner teal:
-  `"Bukti pembayaran sedang diverifikasi. Lihat status di menu EPB & Invoice →"` (link ke `/customer/epb-invoice`).
+  `"Bukti pembayaran sedang diverifikasi. Lihat status di menu EPB & Invoice →"` (link ke `/customer/billing/epb`).
 
 > Upload proof dilakukan sepenuhnya di M9b melalui `POST /api/customer/epb-payments/:id/proof`. M9b yang bertanggung jawab mengupdate `nominations.status` saat proof berhasil diupload.
 
@@ -271,7 +273,7 @@ Use TanStack React Query to fetch `/api/customer/nominations/:id/status`. Poll e
 *Schedule & EPB* — visible when status is `APPROVED` or `WAITING_PAYMENT_VERIFICATION`:
 - Anchor Point, ETB (formatted date-time), Estimated Duration
 - EPB Number, Amount (format as "Rp XX.XXX.XXX"), Due Date
-- Tombol **"Bayar EPB"** → link ke `/customer/epb-invoice` (hanya tampil saat `APPROVED`)
+- Tombol **"Bayar EPB"** → link ke `/customer/billing/epb` (hanya tampil saat `APPROVED`)
 
 *Info Banner EPB* — visible when status is `WAITING_PAYMENT_VERIFICATION`:
 - Teal info box: "Bukti pembayaran sedang diverifikasi." + link ke EPB & Invoice
@@ -304,7 +306,7 @@ Pre-fill form with existing nomination data. Same form as M8 NominationFormPage 
 - [ ] Status changes within 1 minute of STS webhook receipt
 - [ ] Customer receives in-app + email notification on every status change
 - [ ] EPB section (Schedule & EPB + tombol "Bayar EPB") visible when status is `APPROVED`
-- [ ] Tombol "Bayar EPB" mengarah ke `/customer/epb-invoice`
+- [ ] Tombol "Bayar EPB" mengarah ke `/customer/billing/epb`
 - [ ] Saat status `WAITING_PAYMENT_VERIFICATION`: tombol "Bayar EPB" disembunyikan, info banner teal tampil dengan link ke EPB & Invoice
 - [ ] Tidak ada endpoint upload proof di M9 — upload dilakukan di M9b
 - [ ] Revision form is only accessible when status is `NEED_REVISION`

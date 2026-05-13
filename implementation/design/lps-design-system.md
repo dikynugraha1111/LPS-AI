@@ -1,6 +1,6 @@
 # LPS Platform — Design System
 
-**Version:** 1.1 · **Last updated:** 2026-05-13 · **Status:** ACTIVE — single source of truth untuk semua UI work di LPS Platform.
+**Version:** 1.2 · **Last updated:** 2026-05-13 · **Status:** ACTIVE — single source of truth untuk semua UI work di LPS Platform.
 
 > **Cara pakai:** Setiap kerja UI (baru, edit, refactor) **wajib** baca dokumen ini dulu, lalu invoke skill `ui-ux-pro-max` untuk validasi/generate komponen. Per-modul design doc (`m<N>-<name>-ui.md`) menjabarkan penerapan untuk modul masing-masing dan tetap merujuk ke dokumen ini.
 
@@ -59,7 +59,9 @@ Setiap status pakai tiga shade: `50` (background), `200` (border), `700` (text).
 | **Warning / Need Revision** | `#FFF7ED` | `#FED7AA` | `#C2410C` | `bg-orange-50 border-orange-200 text-orange-700` |
 | **Pending verify** | `#F0FDFA` | `#99F6E4` | `#0F766E` | `bg-teal-50 border-teal-200 text-teal-700` |
 | **Confirmed / Paid** | `#ECFDF5` | `#A7F3D0` | `#047857` | `bg-emerald-50 border-emerald-200 text-emerald-700` |
-| **Neutral (UNPAID, Draft)** | `#F1F5F9` | `#E2E8F0` | `#475569` | `bg-slate-100 border-slate-200 text-slate-600` |
+| **Neutral (Belum Dibayar, Draft)** | `#F1F5F9` | `#E2E8F0` | `#475569` | `bg-slate-100 border-slate-200 text-slate-600` |
+| **Action Required (Perlu Tindakan)** | `#FEF2F2` | `#FECACA` | `#B91C1C` | `bg-rose-50 border-rose-200 text-rose-700` |
+| **Overdue indicator** | `#FEE2E2` | `#FCA5A5` | `#991B1B` | `bg-rose-100 border-rose-300 text-rose-800` (dengan icon ⚠ `AlertTriangle`) |
 | **Severity Warning (uppercase)** | `#FEFCE8` | `#FDE68A` | `#92400E` | `bg-yellow-50 border-yellow-300 text-yellow-800 uppercase` |
 | **Error / Urgent** | `#FEF2F2` | `#FECACA` | `#B91C1C` | `bg-rose-50 border-rose-200 text-rose-700` |
 | **Loading / In Progress** | `#EFF6FF` | `#BFDBFE` | `#1D4ED8` | `bg-blue-50 border-blue-200 text-blue-700` |
@@ -72,10 +74,12 @@ Setiap status pakai tiga shade: `50` (background), `200` (border), `700` (text).
 | `SUBMITTED` / `PENDING` | Menunggu Review | Pending Review | Info / Review |
 | `APPROVED` | Disetujui | Approved | Success |
 | `NEED_REVISION` | Perlu Revisi | Need Revision | Warning |
-| `UNPAID` | UNPAID | Unpaid | Neutral (uppercase) |
-| `WAITING_PAYMENT_VERIFICATION` | Menunggu Verifikasi Pembayaran | Waiting Payment Verification | Pending verify |
+| `UNPAID` (EPB/Invoice) | Belum Dibayar | Unpaid | Neutral |
+| `WAITING_PAYMENT_VERIFICATION` | Menunggu Verifikasi | Waiting Verification | Pending verify |
 | `PAYMENT_REJECT` | Pembayaran Ditolak | Payment Rejected | Error |
-| `PAID` / `PAYMENT_CONFIRMED` | Pembayaran Dikonfirmasi | Payment Confirmed | Confirmed |
+| `PAID` / `PAYMENT_CONFIRMED` | Lunas | Paid | Confirmed |
+| **Kategori filter "Perlu Tindakan"** (UNPAID + PAYMENT_REJECT + Overdue) | Perlu Tindakan | Action Required | Action Required |
+| **Overdue indicator** (due_date < now & status != Lunas) | Lewat jatuh tempo | Overdue | Overdue indicator |
 | `WARNING` (cuaca) | WARNING | WARNING | Severity Warning |
 | `ACTIVE` (vessel) | Aktif | ACTIVE | Success |
 | `LOADING` (vessel) | Loading | LOADING | Info |
@@ -218,6 +222,92 @@ Primary button dengan icon: `<Plus className="h-4 w-4" />` di kiri text, gap `ga
 ```
 
 Mapping `{bg} {border} {text}` ambil dari Status palette §2.1.
+
+#### KPI Filter Pill (kategori billing/EPB)
+
+Pattern untuk menampilkan ringkasan jumlah item per kategori filter di atas tabs. Dipakai di list page EPB & Invoice. **Clickable** untuk shortcut filter (klik pill → aktifkan tab terkait).
+
+```jsx
+<div className="flex flex-wrap gap-3 mb-6">
+  <button className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-left transition hover:border-rose-300">
+    <div className="text-2xl font-bold text-rose-700">1</div>
+    <div className="text-xs font-medium text-rose-700 mt-0.5">Perlu Tindakan</div>
+  </button>
+  <button className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left transition hover:border-amber-300">
+    <div className="text-2xl font-bold text-amber-700">2</div>
+    <div className="text-xs font-medium text-amber-700 mt-0.5">Menunggu Verifikasi</div>
+  </button>
+  <button className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:border-emerald-300">
+    <div className="text-2xl font-bold text-emerald-700">1</div>
+    <div className="text-xs font-medium text-emerald-700 mt-0.5">Lunas</div>
+  </button>
+</div>
+```
+
+**Aturan:**
+- Hanya 3 pill default: Perlu Tindakan (rose), Menunggu Verifikasi (amber), Lunas (emerald).
+- Count = jumlah item dalam kategori. Tampil "0" jika kosong (jangan hide — biar customer paham kategori-nya ada).
+- Hover: border-color naik 1 step. Active (kategori sedang dipilih sebagai filter): tambah `ring-2 ring-offset-1 ring-{color}-400`.
+- Mobile: pill jadi stack 2-up (`grid grid-cols-2 gap-2`).
+
+#### Overdue Date Display
+
+Pattern untuk menampilkan tanggal jatuh tempo yang sudah lewat. Dipakai di list/detail EPB/Invoice.
+
+```jsx
+{/* Normal due date */}
+<div className="inline-flex items-center gap-1.5 text-xs text-slate-500">
+  <Calendar className="h-3.5 w-3.5" />
+  <span>Jatuh tempo: 20 Mei 2026</span>
+</div>
+
+{/* Overdue */}
+<div className="inline-flex items-center gap-1.5 text-xs font-medium text-rose-700">
+  <Calendar className="h-3.5 w-3.5" />
+  <span>Lewat jatuh tempo: 27 April 2026</span>
+  <AlertTriangle className="h-3.5 w-3.5" />
+</div>
+```
+
+**Aturan deteksi:**
+- Overdue = `due_date < now()` AND `status != Lunas`.
+- Color: text rose-700, icon AlertTriangle kanan untuk emphasis.
+- Untuk Lunas yang overdue saat dibayar (paid_at > due_date): tampilkan "Lewat jatuh tempo: {date}" rose tapi **tanpa** AlertTriangle (sudah resolved, hanya informational).
+
+#### Inline Info Banner (di dalam card list item)
+
+Pattern banner kecil yang muncul di dalam card list untuk memberi konteks status. Dipakai di EPB/Invoice list item.
+
+```jsx
+{/* Action required */}
+<div className="rounded-lg border border-rose-200 bg-rose-50/60 px-3 py-2 text-sm text-rose-700 flex items-start gap-2">
+  <CreditCard className="h-4 w-4 mt-0.5 flex-shrink-0" />
+  <span>Silakan lakukan pembayaran dan unggah bukti transfer untuk melanjutkan proses.</span>
+</div>
+
+{/* Waiting verification */}
+<div className="rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm text-amber-800 flex items-start gap-2">
+  <Clock className="h-4 w-4 mt-0.5 flex-shrink-0" />
+  <span>Bukti pembayaran sedang dalam proses verifikasi oleh tim kami. Harap tunggu konfirmasi.</span>
+</div>
+
+{/* Paid */}
+<div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-700 flex items-start gap-2">
+  <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+  <span>Pembayaran telah dikonfirmasi pada 29 April 2026.</span>
+</div>
+
+{/* Rejected */}
+<div className="rounded-lg border border-rose-200 bg-rose-50/60 px-3 py-2 text-sm text-rose-700 flex items-start gap-2">
+  <XCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+  <span>Bukti pembayaran ditolak. Alasan: {reason}. Silakan upload ulang.</span>
+</div>
+```
+
+**Aturan:**
+- Wajib pakai di setiap row list EPB/Invoice (selalu ada konteks per status).
+- Icon kiri sesuai semantik: `CreditCard` untuk Belum Dibayar, `Clock` untuk Menunggu Verifikasi, `CheckCircle` untuk Lunas, `XCircle` untuk Pembayaran Ditolak.
+- Background `/60` (lebih halus dari banner detail page yang `/40`) karena berada dalam list density.
 
 #### Severity Badge (uppercase)
 
@@ -410,7 +500,7 @@ Accent variant (warning/error/primary metric): tambah `border-l-4 border-l-{colo
         <div className="text-xs text-slate-400">NOM-20260325-00005</div>
       </div>
     </div>
-    <StatusBadge variant="success">Pembayaran Dikonfirmasi</StatusBadge>
+    <StatusBadge variant="success">Lunas</StatusBadge>
   </div>
   <dl className="space-y-1.5 text-sm">
     <div className="flex items-center gap-2 text-slate-600"><MapPin className="h-4 w-4 text-slate-400" /> AP-01</div>
@@ -829,3 +919,4 @@ Sebelum klaim selesai untuk pekerjaan UI:
 |---|---|---|
 | 2026-05-13 | 1.0 | Initial release — foundation, dua surface preset, component library, mapping status LPS. Dibuat dari analisis screenshot production (Customer Portal + LPS System Bunati Port). |
 | 2026-05-13 | 1.1 | Tambah pattern auth split-screen layout (customer login/register), Input with leading icon + eye toggle, Divider with text, Image Showcase Carousel dengan 3 default slides Surface A, Auth Centered layout (admin login), brand mark wordmark variant (anchor + "LPS System"), canonical naming. Dipicu oleh screenshot login customer baru. |
+| 2026-05-13 | 1.2 | **Status label sync dengan production:** UNPAID→"Belum Dibayar", Pembayaran Dikonfirmasi→"Lunas", Menunggu Verifikasi Pembayaran→"Menunggu Verifikasi" (lebih ringkas). Tambah kategori filter "Perlu Tindakan" (UNPAID+PAYMENT_REJECT+Overdue) sebagai meta-status untuk KPI pill & tab. Tambah komponen baru: KPI Filter Pill (3 default kategori billing), Overdue Date Display (deteksi due_date < now), Inline Info Banner (varian per status untuk list items). Tambah Overdue indicator palette token. Dipicu oleh pemisahan M9b/M9c dan screenshot production EPB & Invoice. |

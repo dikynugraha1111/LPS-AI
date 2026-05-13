@@ -2,7 +2,7 @@
 
 **Disiapkan oleh:** PT Solutionlabs Group Indonesia  
 **Disiapkan untuk:** GK Group & PT Tata Bumi Khatulistiwa (PT TBK)  
-**Versi:** 3.2  
+**Versi:** 3.3  
 **Tanggal Update:** Mei 2026  
 **Status:** [DRAFT]
 
@@ -43,6 +43,12 @@
 | 18 | Section 3.4.9 | FR-NP-06 direvisi: upload bukti pembayaran tidak lagi dilakukan di halaman EPB Confirmation M9, melainkan di menu EPB & Invoice (M9b). FR-NP-07 direvisi: setelah Approved, sistem otomatis membuat record EPB di M9b dengan status UNPAID tanpa aksi customer. | REVISI | Keputusan Arsitektur (Mei 2026) |
 | 19 | Section 3.4.9b | FR-EI-04: status "Pending Review" diubah menjadi "Waiting Payment Verification". FR-EI-07 direvisi: STS hanya mengirim webhook PAYMENT_REJECT dan PAID (tidak ada EPB_PENDING_REVIEW — M9b langsung set WAITING_PAYMENT_VERIFICATION saat customer upload). | REVISI | Keputusan Arsitektur (Mei 2026) |
 | 20 | Appendix A.2 | Status payment di menu EPB & Invoice diupdate: "Pending Review" → "Waiting Payment Verification". | REVISI | Keputusan Arsitektur (Mei 2026) |
+| 21 | Section 2.1 | **M9b di-split jadi dua modul: M9b (EPB) dan M9c (Invoice).** M9b sekarang scope **EPB only** dengan kemampuan customer membayar parsial (min 1 USD). M9c **baru ditambahkan**: "Invoice (Customer Portal)" untuk tagihan settlement yang berasal dari shortfall EPB atau Additional Service request. UI tetap satu menu "EPB & Invoice" di sidebar Customer Portal dengan internal tabs EPB vs Invoice. | SPLIT / TAMBAH | Screenshot Flow Production (Mei 2026) |
+| 22 | Section 3.1 | Tabel modul: tambah baris M9c. Total modul aktif menjadi 13 (M1–M12 + M9b + M9c). | UPDATE | Splitting M9b/M9c |
+| 23 | Section 3.4.9b | FR-EI direvisi: scope hanya EPB, tambah FR-EI-09 (partial payment dengan min 1 USD), update label status ke Bahasa Indonesia natural ("Belum Dibayar", "Menunggu Verifikasi", "Pembayaran Ditolak", "Lunas"). FR-EI-10 baru: trigger generate Invoice (M9c) saat shortfall terdeteksi setelah EPB Lunas parsial. | REVISI | Splitting M9b/M9c |
+| 24 | Section 3.4.9c | **Section BARU:** FR-IN-01 s/d FR-IN-08 untuk Invoice (Customer Portal). Mencakup auto-create dari webhook STS (sumber: EPB_SHORTFALL atau ADDITIONAL_SERVICE), lifecycle 4 status (sama dengan EPB), upload proof, re-upload saat reject. | TAMBAH | Screenshot Flow Production (Mei 2026) |
+| 25 | Appendix A.2 | Status payment label disinkronkan dengan terminologi production: "Belum Dibayar", "Menunggu Verifikasi", "Pembayaran Ditolak", "Lunas". Tambah sub-section Invoice dengan lifecycle yang sama. Tambah kategori filter "Perlu Tindakan" (Belum Dibayar + Pembayaran Ditolak + Overdue). | REVISI / TAMBAH | Screenshot UI Production |
+| 26 | Section 1.3 | Tabel hubungan LPS-STS: pisah baris "EPB & Invoice Customer Portal" menjadi dua baris (EPB partial payment + Invoice settlement) untuk klarifikasi pembagian tanggung jawab. | KLARIFIKASI | Splitting M9b/M9c |
 
 ---
 
@@ -94,7 +100,8 @@ Sistem LPS dan STS Platform beroperasi sebagai **dua sistem terpisah yang terhub
 | System Configuration | ✅ Mengelola (API, weather threshold, alert, user/role) | — |
 | Master Data (Vessel, Stakeholder, Rate Card) | Konsumsi via API | ✅ Mengelola (CRUD) |
 | Billing & Service Charge (kalkulasi, invoice, reconciliation) | — | ✅ Mengelola |
-| EPB & Invoice Customer Portal (upload bukti bayar, monitoring status payment) | ✅ Interface customer | Verifikasi & keputusan |
+| EPB Customer Portal (upload bukti bayar EPB, partial payment min 1 USD) | ✅ Interface customer | Verifikasi pembayaran EPB & keputusan |
+| Invoice Customer Portal (settlement shortfall EPB + Additional Service) | ✅ Interface customer | Generate invoice, verifikasi & keputusan |
 | Reporting & Analytics | — | ✅ Mengelola |
 | Voyage Lifecycle Mgmt | — | ✅ Mengelola |
 | Field Operation Mgmt | — | ✅ Mengelola |
@@ -273,31 +280,69 @@ Modul yang mengelola proses setelah nominasi disubmit hingga customer melakukan 
 
 > **Batasan Modul:** M9 tidak menyediakan form upload bukti pembayaran. Upload proof dilakukan sepenuhnya di menu EPB & Invoice (M9b). Proses approval, resource assignment, scheduling, generate EPB, dan verifikasi pembayaran seluruhnya dilakukan oleh STS Platform. Siklus Unpaid → Waiting Payment Verification → Payment Reject → Paid dikelola di menu EPB & Invoice (M9b).
 
-#### 9b. EPB & Invoice (Customer Portal) — **BARU** *(diidentifikasi dari Swimlane V3 Screenshot Terbaru)*
+#### 9b. EPB (Customer Portal) — **REVISED** *(scope EPB-only, partial payment)*
 
 **Definisi**  
-Menu dalam Customer Portal LPS yang berfungsi sebagai interface pemantauan status pembayaran EPB dan manajemen revisi bukti pembayaran. Data EPB di-generate oleh STS Platform; LPS hanya menampilkan dan mengelola proses upload/revisi bukti bayar.
+Modul dalam Customer Portal LPS yang mengelola pembayaran **EPB (Estimasi Perkiraan Biaya)** — tagihan awal yang dikeluarkan STS Platform setelah nominasi disetujui. Customer dapat membayar penuh atau parsial (minimum 1 USD); shortfall otomatis dipindahkan ke modul Invoice (M9c) sebagai tagihan settlement. Data EPB di-generate oleh STS Platform; LPS hanya menampilkan dan mengelola proses upload bukti bayar.
 
 **Tujuan**
 - Menyediakan visibilitas status payment EPB bagi customer.
+- Memfasilitasi partial payment EPB (min 1 USD) dengan auto-routing shortfall ke modul Invoice.
 - Memfasilitasi upload ulang bukti pembayaran jika sebelumnya ditolak.
-- Menjadi single place bagi customer untuk memantau semua EPB & Invoice mereka.
 
 **Cakupan**
 
-*4 Status Payment*
-- **Unpaid:** Record EPB dibuat otomatis oleh sistem saat nominasi di-approve oleh STS Platform. Customer dapat klik "Pay" untuk memulai proses upload bukti pembayaran.
-- **Waiting Payment Verification:** Bukti pembayaran sudah disubmit oleh customer, menunggu verifikasi dari STS Platform (view-only). Status nominasi di M9 juga ikut berubah menjadi "Waiting Payment Verification".
-- **Payment Reject:** Bukti pembayaran ditolak oleh STS Platform. Customer dapat klik "Revision Data" untuk mengupload ulang bukti bayar yang benar.
-- **Paid:** Pembayaran telah dikonfirmasi oleh STS Platform (view-only).
+*4 Status Payment EPB*
+- **Belum Dibayar:** Record EPB dibuat otomatis oleh sistem saat nominasi di-approve oleh STS Platform. Customer dapat klik "Bayar" untuk memulai upload bukti pembayaran. Customer dapat input nominal pembayaran (min 1 USD; tidak harus full).
+- **Menunggu Verifikasi:** Bukti pembayaran sudah disubmit, menunggu verifikasi STS Platform (view-only). Status nominasi di M9 juga ikut berubah menjadi "Waiting Payment Verification".
+- **Pembayaran Ditolak:** Bukti pembayaran ditolak oleh STS Platform. Customer dapat klik "Revisi Data" untuk mengupload ulang bukti bayar.
+- **Lunas:** Pembayaran EPB telah dikonfirmasi oleh STS Platform. Jika `paid_amount < total_amount`, STS otomatis mengirim webhook untuk membuat row Invoice (M9c) dengan source `EPB_SHORTFALL` dan amount = shortfall.
 
 *Flow per Status*
-- **Unpaid:** `Click Pay → Upload Payment Proof and fill the data → Submit` → status berubah ke Waiting Payment Verification
-- **Waiting Payment Verification:** View-only, menunggu keputusan STS Platform
-- **Payment Reject:** `Click Revision Data → Upload Payment Proof and fill the data → Submit` → status kembali ke Waiting Payment Verification
-- **Paid:** View-only, completed
+- **Belum Dibayar:** `Click Bayar → Input nominal (≥ 1 USD) → Upload bukti pembayaran → Submit` → status berubah ke Menunggu Verifikasi
+- **Menunggu Verifikasi:** View-only, menunggu keputusan STS Platform
+- **Pembayaran Ditolak:** `Click Revisi Data → Upload bukti pembayaran baru → Submit` → status kembali ke Menunggu Verifikasi
+- **Lunas:** View-only, completed. Jika ada shortfall, Invoice (M9c) auto-created via webhook STS.
 
-> **Batasan:** Verifikasi pembayaran (keputusan Reject/Paid) sepenuhnya dilakukan oleh STS Platform. LPS hanya menerima status update dari STS Platform dan menampilkan hasilnya ke customer. Upload proof (baik pertama kali maupun re-upload) dilakukan melalui satu endpoint yang sama di M9b, dibedakan oleh status saat ini (Unpaid atau Payment Reject).
+*Partial Payment Logic*
+- Customer bebas memilih nominal pembayaran selama ≥ 1 USD (dalam IDR equivalent).
+- STS Platform menentukan apakah pembayaran tersebut diterima (Lunas) atau ditolak (Pembayaran Ditolak).
+- Saat status EPB = Lunas dengan `paid_amount < total_amount`, STS Platform mengirim webhook `EPB_SHORTFALL_DETECTED` yang membuat record di M9c (Invoice) dengan source `EPB_SHORTFALL`.
+
+> **Batasan:** Verifikasi pembayaran (keputusan Reject/Paid) sepenuhnya dilakukan oleh STS Platform. Upload proof (baik pertama kali maupun re-upload) dilakukan melalui satu endpoint yang sama di M9b, dibedakan oleh status saat ini. UI M9b berada di tab "EPB" dalam menu "EPB & Invoice" di sidebar Customer Portal (menu sidebar tetap satu; M9b dan M9c dipisah secara backend & module structure).
+
+#### 9c. Invoice (Customer Portal) — **BARU** *(diidentifikasi dari Screenshot Flow Production Mei 2026)*
+
+**Definisi**  
+Modul dalam Customer Portal LPS yang mengelola pembayaran **Invoice** — tagihan settlement yang muncul dari (a) shortfall pembayaran EPB sebelumnya atau (b) Additional Service yang dipakai customer selama voyage. Invoice di-generate otomatis oleh STS Platform via webhook dan dikelola di LPS sebagai interface customer.
+
+**Tujuan**
+- Menyediakan visibilitas tagihan settlement (shortfall EPB + Additional Service) bagi customer.
+- Memfasilitasi upload bukti pembayaran Invoice dan re-upload jika ditolak.
+- Memisahkan secara backend antara tagihan utama (EPB) dan tagihan settlement (Invoice) sesuai realita business flow.
+
+**Cakupan**
+
+*Source Invoice*
+- **EPB_SHORTFALL:** Invoice yang muncul saat customer membayar EPB secara parsial (paid_amount < total_amount). STS Platform mengirim webhook `EPB_SHORTFALL_DETECTED` dengan amount = shortfall. Invoice ini ter-link ke parent EPB.
+- **ADDITIONAL_SERVICE:** Invoice yang muncul saat customer menggunakan Additional Service (Tank Cleaning, Bunkering & Fresh Water Supplying, Short Stay Temporary, Supply Logistic, Lay Up, Ship Chandler, Kapal Emergency) selama voyage. STS Platform mengirim webhook `ADDITIONAL_SERVICE_INVOICE` dengan amount dan service keys.
+
+*4 Status Payment Invoice*
+- **Belum Dibayar:** Record Invoice dibuat otomatis oleh webhook STS. Customer dapat klik "Bayar" untuk memulai upload bukti pembayaran.
+- **Menunggu Verifikasi:** Bukti pembayaran sudah disubmit, menunggu verifikasi STS Platform (view-only).
+- **Pembayaran Ditolak:** Bukti pembayaran ditolak. Customer dapat klik "Revisi Data" untuk mengupload ulang.
+- **Lunas:** Pembayaran Invoice telah dikonfirmasi oleh STS Platform (view-only, terminal).
+
+*Flow per Status*
+- **Belum Dibayar:** `Click Bayar → Upload bukti pembayaran → Submit` → status berubah ke Menunggu Verifikasi
+- **Menunggu Verifikasi:** View-only, menunggu keputusan STS Platform
+- **Pembayaran Ditolak:** `Click Revisi Data → Upload bukti pembayaran baru → Submit` → status kembali ke Menunggu Verifikasi
+- **Lunas:** View-only, completed (terminal)
+
+*Hubungan dengan Nominasi*
+- Invoice **tidak memblokir** lifecycle nominasi. Nominasi status `PAYMENT_CONFIRMED` ditentukan oleh EPB Lunas (M9b), bukan oleh Invoice. Invoice adalah settlement separate yang dapat berjalan paralel/setelah voyage.
+
+> **Batasan:** Verifikasi pembayaran Invoice sepenuhnya dilakukan oleh STS Platform. LPS tidak generate Invoice secara mandiri — semua Invoice berasal dari webhook STS. UI M9c berada di tab "Invoice" dalam menu "EPB & Invoice" di sidebar Customer Portal.
 
 #### 10. Customer Dashboard & Monitoring — **BARU**
 
@@ -426,7 +471,8 @@ Berikut adalah asumsi yang digunakan dalam penyusunan Business Requirement Docum
 | M7 | Customer Authentication & Onboarding | Customer Portal |
 | M8 | Nomination Request Submission | Customer Portal |
 | M9 | Nomination Status & EPB Confirmation | Customer Portal |
-| M9b | EPB & Invoice (Customer Portal) | Customer Portal |
+| M9b | EPB (Customer Portal) | Customer Portal |
+| M9c | Invoice (Customer Portal) | Customer Portal |
 | M10 | Customer Dashboard & Monitoring | Customer Portal |
 | M11 | Monitoring & Visibility Dashboard | Monitoring |
 | M12 | System Configuration | Konfigurasi |
@@ -505,7 +551,8 @@ Sistem menerapkan Role-Based Access Control (RBAC) untuk memastikan setiap pengg
 | Customer Authentication | — | — | — | Approve Reg. / Add Customer | — | — | Register & Login | View |
 | Nomination Submission | — | — | — | View | — | — | Full | View |
 | Nomination Status & EPB Confirmation | — | — | — | View | — | — | Full | View |
-| EPB & Invoice (Customer Portal) | — | — | — | View | — | — | Full | View |
+| EPB (Customer Portal) | — | — | — | View | — | — | Full | View |
+| Invoice (Customer Portal) | — | — | — | View | — | — | Full | View |
 | Customer Dashboard & Monitoring | — | — | — | View | — | — | Full | View |
 | Monitoring Dashboard | Full | View | View | Full | View | View | View (limited) | Full |
 | System Configuration | — | — | — | Limited | — | — | — | Full |
@@ -617,19 +664,33 @@ Sistem menerapkan Role-Based Access Control (RBAC) untuk memastikan setiap pengg
 | FR-NP-07 | Saat STS Platform mengirim status Approved, sistem harus **otomatis membuat record EPB di menu EPB & Invoice (M9b) dengan status Unpaid**, tanpa memerlukan aksi dari customer | System |
 | FR-NP-08 | Setelah customer upload bukti pembayaran di M9b, status nominasi di M9 harus ikut berubah menjadi "Waiting Payment Verification" secara bersamaan | System |
 
-#### 3.4.9b. EPB & Invoice (Customer Portal) — **BARU** *(diidentifikasi dari Swimlane V3 Screenshot Terbaru)*
+#### 3.4.9b. EPB (Customer Portal) — **REVISED** *(scope EPB-only, partial payment)*
 
 | FR ID | Requirements | Actor |
 |-------|-------------|-------|
-| FR-EI-01 | Sistem harus menyediakan menu EPB & Invoice di Customer Portal yang menampilkan daftar seluruh EPB customer beserta status pembayaran terkini (Unpaid, Waiting Payment Verification, Payment Reject, Paid) | Customer |
-| FR-EI-02 | Customer harus dapat melihat detail EPB dan Invoice (view-only) dengan mengklik item di daftar EPB & Invoice | Customer |
-| FR-EI-03 | Untuk EPB berstatus **Unpaid**, customer harus dapat memulai proses pembayaran dengan mengklik tombol "Pay", kemudian mengupload bukti pembayaran dan mengisi data terkait, kemudian Submit | Customer |
-| FR-EI-04 | Untuk EPB berstatus **Waiting Payment Verification**, sistem harus menampilkan status dalam mode view-only; tidak ada aksi yang dapat dilakukan customer hingga STS Platform memberikan keputusan | Customer |
-| FR-EI-05 | Untuk EPB berstatus **Payment Reject**, customer harus dapat mengklik "Revision Data" untuk mengupload ulang bukti pembayaran yang benar dan melakukan re-submit | Customer |
-| FR-EI-06 | Untuk EPB berstatus **Paid**, sistem harus menampilkan detail dalam mode view-only sebagai konfirmasi bahwa pembayaran telah selesai | Customer |
-| FR-EI-07 | Sistem harus menerima status update pembayaran dari STS Platform (Payment Reject / Paid) dan memperbarui tampilan di menu EPB & Invoice secara real-time. STS hanya mengirim dua event: EPB_PAYMENT_REJECT dan EPB_PAID. Status Waiting Payment Verification di-set langsung oleh LPS saat customer upload proof | System |
-| FR-EI-08 | Sistem harus mengirimkan data bukti pembayaran (upload dari FR-EI-03 atau FR-EI-05) ke STS Platform via API untuk proses verifikasi | System |
-| FR-EI-09 | Setelah customer berhasil upload bukti pembayaran (FR-EI-03 atau FR-EI-05), sistem harus mengupdate status nominasi terkait di M9 menjadi "Waiting Payment Verification" secara bersamaan dalam satu transaksi | System |
+| FR-EI-01 | Sistem harus menyediakan tab "EPB" di menu "EPB & Invoice" Customer Portal yang menampilkan daftar seluruh EPB customer beserta status pembayaran terkini (Belum Dibayar, Menunggu Verifikasi, Pembayaran Ditolak, Lunas) | Customer |
+| FR-EI-02 | Customer harus dapat melihat detail EPB (view-only) dengan mengklik item di daftar EPB | Customer |
+| FR-EI-03 | Untuk EPB berstatus **Belum Dibayar**, customer harus dapat memulai proses pembayaran dengan mengklik tombol "Bayar", **menginput nominal pembayaran (minimum 1 USD ekuivalen IDR)**, mengupload bukti pembayaran, dan melakukan Submit | Customer |
+| FR-EI-04 | Untuk EPB berstatus **Menunggu Verifikasi**, sistem harus menampilkan status dalam mode view-only; tidak ada aksi yang dapat dilakukan customer hingga STS Platform memberikan keputusan | Customer |
+| FR-EI-05 | Untuk EPB berstatus **Pembayaran Ditolak**, customer harus dapat mengklik "Revisi Data" untuk mengupload ulang bukti pembayaran yang benar dan melakukan re-submit | Customer |
+| FR-EI-06 | Untuk EPB berstatus **Lunas**, sistem harus menampilkan detail dalam mode view-only sebagai konfirmasi bahwa pembayaran telah selesai | Customer |
+| FR-EI-07 | Sistem harus menerima status update pembayaran dari STS Platform dan memperbarui tampilan di tab EPB secara real-time. STS mengirim event: `EPB_PAYMENT_REJECT` dan `EPB_PAID`. Status Menunggu Verifikasi di-set langsung oleh LPS saat customer upload proof | System |
+| FR-EI-08 | Sistem harus mengirimkan data bukti pembayaran beserta nominal yang dibayarkan (`paid_amount`) ke STS Platform via API untuk proses verifikasi | System |
+| FR-EI-09 | Setelah customer berhasil upload bukti pembayaran, sistem harus mengupdate status nominasi terkait di M9 menjadi "Waiting Payment Verification" secara bersamaan dalam satu transaksi | System |
+| FR-EI-10 | Customer harus dapat membayar EPB secara parsial (paid_amount < total_amount), dengan nominal minimum **1 USD ekuivalen IDR**. Saat status EPB berubah ke Lunas dengan paid_amount < total_amount, STS Platform mengirim webhook `EPB_SHORTFALL_DETECTED` yang men-trigger pembuatan record Invoice di M9c dengan source `EPB_SHORTFALL` dan amount = shortfall | System |
+
+#### 3.4.9c. Invoice (Customer Portal) — **BARU** *(diidentifikasi dari Screenshot Flow Production Mei 2026)*
+
+| FR ID | Requirements | Actor |
+|-------|-------------|-------|
+| FR-IN-01 | Sistem harus menyediakan tab "Invoice" di menu "EPB & Invoice" Customer Portal yang menampilkan daftar seluruh Invoice customer beserta status pembayaran terkini (Belum Dibayar, Menunggu Verifikasi, Pembayaran Ditolak, Lunas) | Customer |
+| FR-IN-02 | Sistem harus menerima webhook dari STS Platform yang men-trigger pembuatan Invoice. Source webhook ada dua: (a) `EPB_SHORTFALL_DETECTED` — dengan referensi ke parent EPB; (b) `ADDITIONAL_SERVICE_INVOICE` — dengan daftar service keys yang ditagihkan. Sistem harus menyimpan source, parent reference, dan amount | System |
+| FR-IN-03 | Customer harus dapat melihat detail Invoice (view-only) dengan mengklik item di daftar Invoice; detail menampilkan source (Shortfall EPB / Additional Service), referensi parent (jika EPB shortfall) atau daftar service yang ditagih (jika additional service), amount, jatuh tempo | Customer |
+| FR-IN-04 | Untuk Invoice berstatus **Belum Dibayar**, customer harus dapat memulai proses pembayaran dengan mengklik tombol "Bayar", mengupload bukti pembayaran, dan melakukan Submit | Customer |
+| FR-IN-05 | Untuk Invoice berstatus **Menunggu Verifikasi**, sistem harus menampilkan status dalam mode view-only; tidak ada aksi yang dapat dilakukan customer hingga STS Platform memberikan keputusan | Customer |
+| FR-IN-06 | Untuk Invoice berstatus **Pembayaran Ditolak**, customer harus dapat mengklik "Revisi Data" untuk mengupload ulang bukti pembayaran yang benar dan melakukan re-submit | Customer |
+| FR-IN-07 | Sistem harus menerima status update pembayaran Invoice dari STS Platform. STS mengirim event: `INVOICE_PAYMENT_REJECT` dan `INVOICE_PAID`. Status Menunggu Verifikasi di-set langsung oleh LPS saat customer upload proof | System |
+| FR-IN-08 | Invoice **tidak memblokir** lifecycle nominasi. Status nominasi `PAYMENT_CONFIRMED` ditentukan oleh EPB Lunas (M9b), bukan oleh Invoice. Invoice adalah settlement separate yang dapat berjalan paralel/setelah voyage | System |
 
 #### 3.4.10. Customer Dashboard & Monitoring — **BARU**
 
@@ -815,7 +876,27 @@ Fungsi-fungsi berikut kini dikelola oleh STS Platform:
 - Integrasi ERP
 
 **Yang tetap di LPS (Customer Portal):**
-- Menu EPB & Invoice: interface untuk customer melihat detail EPB, mengupload bukti pembayaran, dan memantau status payment (Unpaid / Waiting Payment Verification / Payment Reject / Paid). Record EPB dibuat otomatis oleh LPS saat STS mengirim webhook APPROVED. Verifikasi pembayaran tetap dilakukan oleh STS Platform; LPS hanya menerima dan menampilkan hasilnya.
+
+Customer Portal LPS mempertahankan satu menu "EPB & Invoice" di sidebar yang berisi dua tab internal: **EPB** (M9b) dan **Invoice** (M9c). Secara backend dan struktur module dipisah.
+
+**Tab EPB (M9b)** — interface customer untuk:
+- Melihat detail EPB (tagihan awal) yang di-generate STS Platform.
+- Mengupload bukti pembayaran EPB.
+- Membayar parsial dengan minimum 1 USD ekuivalen IDR (shortfall otomatis menjadi Invoice).
+- Memantau status payment EPB dengan 4 status: **Belum Dibayar** / **Menunggu Verifikasi** / **Pembayaran Ditolak** / **Lunas**.
+- Re-upload bukti pembayaran jika ditolak.
+- Record EPB dibuat otomatis oleh LPS saat STS mengirim webhook `APPROVED`.
+
+**Tab Invoice (M9c)** — interface customer untuk:
+- Melihat detail Invoice (tagihan settlement) yang di-generate STS Platform sebagai shortfall EPB atau Additional Service.
+- Mengupload bukti pembayaran Invoice.
+- Memantau status payment Invoice dengan 4 status yang sama dengan EPB.
+- Re-upload bukti pembayaran jika ditolak.
+- Record Invoice dibuat otomatis oleh LPS saat STS mengirim webhook `EPB_SHORTFALL_DETECTED` atau `ADDITIONAL_SERVICE_INVOICE`.
+
+**Kategori filter di UI:** "Perlu Tindakan" (Belum Dibayar + Pembayaran Ditolak + Overdue), "Menunggu Verifikasi", "Lunas" — dipakai sebagai KPI pill dan tab filter di list page.
+
+Verifikasi pembayaran (Reject/Paid) sepenuhnya dilakukan oleh STS Platform; LPS hanya menerima dan menampilkan hasilnya. Generate tagihan (EPB & Invoice) sepenuhnya di STS Platform — LPS tidak membuat tagihan secara mandiri.
 
 ### A.3 Reporting & Analytics (Dipindahkan)
 

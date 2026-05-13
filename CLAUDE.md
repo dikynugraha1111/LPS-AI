@@ -84,7 +84,8 @@ Folder `document/brd/` berisi satu file per modul (M1–M12) yang dipecah dari B
 | `document/brd/m7-customer-authentication.md` | M7 — Customer Authentication & Onboarding |
 | `document/brd/m8-nomination-submission.md` | M8 — Nomination Request Submission |
 | `document/brd/m9-nomination-status.md` | M9 — Nomination Status & EPB Confirmation |
-| `document/brd/m9b-epb-invoice.md` | M9b — EPB & Invoice (Customer Portal) |
+| `document/brd/m9b-epb-invoice.md` | M9b — EPB (Customer Portal) |
+| `document/brd/m9c-invoice.md` | M9c — Invoice (Customer Portal) |
 | `document/brd/m10-customer-dashboard.md` | M10 — Customer Dashboard & Monitoring |
 | `document/brd/m11-monitoring-dashboard.md` | M11 — Monitoring & Visibility Dashboard |
 | `document/brd/m12-system-configuration.md` | M12 — System Configuration |

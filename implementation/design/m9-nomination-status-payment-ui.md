@@ -1,6 +1,8 @@
 # M9 — Nomination Status & EPB Confirmation · UI Design
 
-**Last updated:** 2026-05-13 · **Surface:** A (Customer Portal) · **Status:** ACTIVE
+**Last updated:** 2026-05-13 (sync status labels v3.3) · **Surface:** A (Customer Portal) · **Status:** ACTIVE
+
+> **v3.3 sync notes:** Status labels diupdate sesuai BRD v3.3 (production sync): "UNPAID" → "Belum Dibayar", "Menunggu Verifikasi Pembayaran" → "Menunggu Verifikasi", "Pembayaran Dikonfirmasi" → "Lunas". Route ke M9b berubah dari `/customer/epb-invoice/:id` → `/customer/billing/epb/:id`.
 
 > Wajib dibaca bersama `lps-design-system.md`.
 
@@ -78,8 +80,8 @@ Komponen Status Banner (design system §3.2). Variant per status nominasi:
 | Submitted / Pending | Info | "Menunggu Review STS Platform" | "Nominasi Anda sedang diverifikasi oleh tim STS. Estimasi 1–2 hari kerja." |
 | Approved | Success | "Nominasi Disetujui" | "Silakan lakukan pembayaran EPB di bawah untuk melanjutkan." |
 | Need Revision | Warning | "Perlu Revisi" | Pesan revisi dari STS + button "Edit Nominasi" → `/customer/nominations/:id/edit`. |
-| Waiting Payment Verification | Pending verify | "Menunggu Verifikasi Pembayaran" | "Bukti pembayaran Anda sedang ditinjau di menu EPB & Invoice." + link |
-| Payment Confirmed | Confirmed | "Pembayaran Dikonfirmasi" | "Nominasi siap diproses. Kapal dapat melanjutkan voyage sesuai jadwal." |
+| Waiting Payment Verification | Pending verify | "Menunggu Verifikasi" | "Bukti pembayaran Anda sedang ditinjau di menu EPB & Invoice." + link |
+| Payment Confirmed | Confirmed | "Lunas" | "EPB telah dibayar. Kapal dapat melanjutkan voyage sesuai jadwal." |
 
 ### 3.2 Status Timeline (right column)
 
@@ -103,7 +105,7 @@ Hanya tampil saat ada aksi yang bisa diambil customer:
 
 - **Status Draft:** button primary "Lanjut Edit" + button ghost "Hapus Draft" (dengan dialog konfirmasi).
 - **Status Need Revision:** button primary "Edit Nominasi" + display alasan revisi dari STS dalam blockquote.
-- **Status Approved:** button primary "Bayar EPB" full-width → navigate ke `/customer/epb-invoice/:epbPaymentId` (M9b).
+- **Status Approved:** button primary "Bayar EPB" full-width → navigate ke `/customer/billing/epb/:epbPaymentId` (M9b).
 - **Status lain:** Card tidak tampil ATAU tampilkan info-only message.
 
 ### 3.4 EPB Detail Section
@@ -116,7 +118,7 @@ EPB Detail
 Nomor EPB           EPB-20260505-00001
 Total Tagihan       Rp 1.250.000.000
 Jatuh Tempo         15 Mei 2026
-Status Pembayaran   [UNPAID]  atau  [Menunggu Verifikasi Pembayaran]  dst
+Status Pembayaran   [Belum Dibayar]  atau  [Menunggu Verifikasi]  atau  [Lunas]  dst
                     
 [          Bayar EPB →          ]   ← primary, full-width
 ```

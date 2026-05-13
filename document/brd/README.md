@@ -22,7 +22,8 @@ Tujuannya adalah kemudahan membaca — setiap file hanya berisi konten yang rele
 | [m7-customer-authentication.md](m7-customer-authentication.md) | M7 — Customer Authentication & Onboarding | Customer Portal |
 | [m8-nomination-submission.md](m8-nomination-submission.md) | M8 — Nomination Request Submission | Customer Portal |
 | [m9-nomination-status.md](m9-nomination-status.md) | M9 — Nomination Status & EPB Confirmation | Customer Portal |
-| [m9b-epb-invoice.md](m9b-epb-invoice.md) | M9b — EPB & Invoice (Customer Portal) | Customer Portal |
+| [m9b-epb-invoice.md](m9b-epb-invoice.md) | M9b — EPB (Customer Portal) | Customer Portal |
+| [m9c-invoice.md](m9c-invoice.md) | M9c — Invoice (Customer Portal) | Customer Portal |
 | [m10-customer-dashboard.md](m10-customer-dashboard.md) | M10 — Customer Dashboard & Monitoring | Customer Portal |
 | [m11-monitoring-dashboard.md](m11-monitoring-dashboard.md) | M11 — Monitoring & Visibility Dashboard | Monitoring |
 | [m12-system-configuration.md](m12-system-configuration.md) | M12 — System Configuration | Konfigurasi |

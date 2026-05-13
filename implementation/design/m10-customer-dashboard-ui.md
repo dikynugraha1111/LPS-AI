@@ -1,6 +1,8 @@
 # M10 — Customer Dashboard & Monitoring · UI Design
 
-**Last updated:** 2026-05-13 · **Surface:** A (Customer Portal) · **Status:** ACTIVE
+**Last updated:** 2026-05-13 (sync v3.3) · **Surface:** A (Customer Portal) · **Status:** ACTIVE
+
+> **v3.3 sync notes:** Status labels nominasi list pakai mapping baru dari design system v1.2 (Lunas, Menunggu Verifikasi, dll). Sidebar "EPB & Invoice" sekarang link ke `/customer/billing` (landing) yang ada tab EPB (M9b) dan Invoice (M9c).
 
 > Wajib dibaca bersama `lps-design-system.md`.
 
@@ -25,7 +27,9 @@ Module scope lihat `module/customer-dashboard-monitoring/README.md`. FR source: 
 | `/customer/weather` | Cuaca & Alert (snapshot + history) | Customer authenticated |
 
 Routes terkait:
-- `/customer/epb-invoice` → M9b
+- `/customer/billing` → landing M9b/M9c (default tab EPB)
+- `/customer/billing/epb` & `/:id` → M9b (EPB)
+- `/customer/billing/invoice` & `/:id` → M9c (Invoice)
 - `/customer/nominations/new` & `/:id/edit` → M8
 - `/customer/nominations/:id` → M9
 
@@ -68,7 +72,7 @@ Routes terkait:
 ```
 
 **Aturan filter:**
-- "Nominasi Aktif" = status IN (Submitted, Pending, Approved, Need Revision, EPB_CONFIRMATION_SUBMITTED, Waiting Payment Verification, Payment Reject). EXCLUDE Draft, Payment Confirmed.
+- "Nominasi Aktif" = status IN (Submitted, Pending, Approved, Need Revision, Waiting Payment Verification, Payment Reject). EXCLUDE Draft, Payment Confirmed.
 - "Voyage Aktif" = nomination dengan status >= Payment Confirmed dan vessel sedang dilacak AIS-nya.
 - Cuaca: ambil snapshot terbaru dari `/api/weather/current`.
 

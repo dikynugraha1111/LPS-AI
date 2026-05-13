@@ -99,8 +99,8 @@ var statusLabels = map[string]string{
     "PENDING":                       "Menunggu proses di STS Platform",
     "APPROVED":                      "Nominasi Disetujui",
     "NEED_REVISION":                 "Perlu Revisi",
-    "WAITING_PAYMENT_VERIFICATION":  "Menunggu Verifikasi Pembayaran",
-    "PAYMENT_CONFIRMED":             "Pembayaran Dikonfirmasi",
+    "WAITING_PAYMENT_VERIFICATION":  "Menunggu Verifikasi",
+    "PAYMENT_CONFIRMED":             "Lunas",
     "SUBMIT_FAILED":                 "Gagal Dikirim",
 }
 ```
@@ -256,8 +256,8 @@ Action column: "Lihat Detail" → `/customer/nominations/:id`
 - SUBMITTED / PENDING → blue
 - APPROVED → green
 - NEED_REVISION → orange
-- WAITING_PAYMENT_VERIFICATION → yellow (label: "Menunggu Verifikasi Pembayaran")
-- PAYMENT_CONFIRMED → dark green
+- WAITING_PAYMENT_VERIFICATION → yellow (label: "Menunggu Verifikasi")
+- PAYMENT_CONFIRMED → green (label: "Lunas")
 - SUBMIT_FAILED → red
 
 Empty state per filter: "Tidak ada nominasi [filter label]."
@@ -417,7 +417,7 @@ File: `src/components/CustomerLayout.tsx`
 Nav items (update from previous):
 - Dashboard → `/customer/dashboard`
 - Nominasi → `/customer/nominations`
-- EPB & Invoice → `/customer/epb-invoice` ⚠️ **tambahan baru (M9b)**
+- EPB & Invoice → `/customer/billing` ⚠️ **v3.3:** landing redirect ke `/customer/billing/epb` (tab EPB default). Halaman target memiliki internal tabs EPB (M9b) | Invoice (M9c).
 - Document Master → `/customer/documents`
 - Cuaca & Alert → `/customer/weather`
 - Keluar (logout) → clear `customer_token` from localStorage, redirect to `/customer/login`
