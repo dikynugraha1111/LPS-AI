@@ -1,10 +1,12 @@
 # BRD Modul M9 — Nomination Status & EPB Confirmation
 
 **Kategori:** Customer Portal  
-**Versi BRD:** 3.2  
+**Versi BRD:** 3.4  
 **Tanggal Update:** Mei 2026  
 **Status Implementasi:** Replit handoff tersedia — [`m9-nomination-status-payment.md`](../../implementation/replit-handoff/m9-nomination-status-payment.md)  
 **Sumber:** [BRD Utama — Section 2.1 & 3.4.9](../BRD-LPS-V3-Analysis.md)
+
+> **Catatan v3.4:** Detail EPB di halaman M9 sekarang menampilkan **preview invoice-style** (data operasional voyage, line items, subtotal/PPn/total, instruksi pembayaran ringkas) sesuai data lengkap dari STS webhook APPROVED. Tambah tombol **Download EPB PDF** dan FR-NP-09.
 
 ---
 
@@ -26,7 +28,12 @@ Modul yang mengelola proses setelah nominasi disubmit hingga customer melakukan 
 - Customer dapat melakukan revisi data nominasi jika status = Need Revision, kemudian re-submit ke STS Platform.
 
 *EPB Detail & Navigasi ke M9b (Jika Approved)*
-- Customer melihat EPB (Estimasi Perkiraan Biaya) yang digenerate oleh STS Platform beserta detail data: schedule, dock, dan nominal yang harus dibayarkan (view-only).
+- Customer melihat EPB (Estimasi Perkiraan Biaya) yang digenerate oleh STS Platform beserta **detail invoice-style lengkap** (view-only):
+  - **Data operasional voyage:** Vessel, Crane, STS Slot, Mooring Team, ETA, Surveyor, Anchor, Est. Duration.
+  - **Line items breakdown:** daftar item layanan (STS Fee + Biaya Jasa Tambahan per service key), volume, rate, jumlah.
+  - **Kalkulasi:** Subtotal → PPn 11% → Total (currency mengikuti field `currency` dari STS, IDR atau USD).
+  - **Instruksi pembayaran:** Bank, No Rekening, Atas Nama, Kode Bayar, Batas Pembayaran (indikator sisa hari, warning bila ≤ 3 hari).
+- Customer dapat mengunduh dokumen EPB resmi (PDF) melalui tombol **"Download EPB PDF"** yang men-stream file dari STS via proxy LPS.
 - Saat STS mengirim webhook APPROVED, sistem **otomatis membuat record EPB di menu EPB & Invoice (M9b) dengan status Unpaid** — tanpa aksi customer.
 - Customer menekan tombol **"Bayar EPB"** untuk dinavigasi ke menu EPB & Invoice (M9b) guna melakukan upload bukti pembayaran.
 
@@ -46,6 +53,7 @@ Modul yang mengelola proses setelah nominasi disubmit hingga customer melakukan 
 | FR-NP-06 | Jika nominasi berstatus Approved, customer harus dapat melihat tombol "Bayar EPB" yang mengarah ke menu EPB & Invoice (M9b) untuk melakukan upload bukti pembayaran | Customer |
 | FR-NP-07 | Saat STS Platform mengirim status Approved, sistem harus **otomatis membuat record EPB di menu EPB & Invoice (M9b) dengan status Unpaid**, tanpa memerlukan aksi dari customer | System |
 | FR-NP-08 | Setelah customer upload bukti pembayaran di M9b, status nominasi di M9 harus ikut berubah menjadi "Waiting Payment Verification" secara bersamaan | System |
+| FR-NP-09 | Saat nominasi berstatus Approved atau setelahnya, halaman detail nominasi M9 harus menampilkan **preview EPB invoice-style** (data operasional voyage, line items, subtotal/PPn/total, instruksi pembayaran ringkas) dan menyediakan tombol **"Download EPB PDF"** yang men-stream dokumen resmi EPB dari STS Platform via proxy LPS | Customer |
 
 ---
 

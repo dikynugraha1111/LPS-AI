@@ -1,6 +1,8 @@
 # M9b — EPB (Customer Portal) · UI Design
 
-**Last updated:** 2026-05-13 (v3.3 split) · **Surface:** A (Customer Portal) · **Status:** ACTIVE
+**Last updated:** 2026-05-14 (v3.5 + Detail Nominasi section) · **Surface:** A (Customer Portal) · **Status:** ACTIVE
+
+> **v3.5 notes:** EPB detail page sekarang memiliki section **"Detail Nominasi"** di atas Invoice Detail Card — menampilkan data nominasi induk (Kapal, Tipe Kapal, Jenis Cargo, Towage Plan, ETA, Agen, Charterer, Dibuat, Diperbarui) dari JOIN ke tabel `nominations`. Section ini selalu tampil (tidak kondisional). Spesifikasi Payment Instruction Box (Block 3) dipertegas sesuai referensi screenshot: 2-column layout di dalam box amber, Total di-highlight bold + navy. Tambah FR-EI-13.
 
 > Wajib dibaca bersama [`lps-design-system.md`](lps-design-system.md). Untuk Invoice (settlement), lihat [`m9c-invoice-ui.md`](m9c-invoice-ui.md).
 
@@ -106,34 +108,130 @@ Table:
 Top tabs: [● EPB]  [○ Invoice]   (preserve navigation)
 ────────────────────────────────────────────────────────────────
 EPB-20260430-00008                                  [Belum Dibayar]
-Ref Nominasi NOM-20260430-00008  ·  MV Nusantara Star
+Ref Nominasi NOM-20260430-00008                     [↓ Download EPB PDF]
 
-┌─ Left col (2/3) ──────────────────┬─ Right col (1/3) ─────────┐
-│                                   │                           │
-│ [Status Banner per status]        │ [Section] Status          │
-│                                   │ Timeline pembayaran       │
-│ [Section] Detail Tagihan          │  ● Tagihan dibuat         │
-│  No. EPB, Total Amount,           │  ● Pembayaran disubmit    │
-│  Paid Amount (jika ada),          │  ○ Verifikasi STS          │
-│  Currency, Due Date,              │  ○ Selesai                │
-│  Status                           │                           │
-│                                   │ [Section] Aksi            │
-│ [Section] Bank Tujuan             │  Kontextual per status    │
-│  Bank, No. rekening, a.n.,        │  (lihat §5.2)             │
-│  copy button                      │                           │
-│                                   │                           │
-│ [Section] Riwayat Pembayaran      │                           │
-│  Per attempt: nominal, file,      │                           │
-│  status outcome, reason           │                           │
-│                                   │                           │
-│ [Info banner — jika applicable]   │                           │
-│  "Sisa pembayaran Rp X telah      │                           │
-│   ditagihkan via Invoice          │                           │
-│   [Lihat Invoice →]"              │                           │
-└───────────────────────────────────┴───────────────────────────┘
+┌─ Left col (2/3) ──────────────────────────────────┬─ Right col (1/3) ────┐
+│                                                   │                      │
+│ [Status Banner per status]                        │ [Section] Status     │
+│                                                   │ Timeline pembayaran  │
+│ ┌── Section: Detail Nominasi ───────────────────┐ │  ● Tagihan dibuat    │
+│ │  Kapal       MV Pacific Glory  ETA  09 Mei…   │ │  ● Pembayaran        │
+│ │  Tipe Kapal  Cement Carrier    Agen PT Sam…   │ │     disubmit         │
+│ │  Jenis Cargo Semen             Charterer …    │ │  ○ Verifikasi STS    │
+│ │  Towage Plan 1 Tugboat         Dibuat   …     │ │  ○ Selesai           │
+│ │                                Diperbarui…    │ │                      │
+│ └───────────────────────────────────────────────┘ │ [Section] Aksi       │
+│                                                   │  Kontextual per      │
+│ ╔═══════════════════════════════════════════════╗ │  status (lihat §5.2) │
+│ ║ INVOICE DETAIL CARD (design system §3.2 v1.3) ║ │                      │
+│ ║                                               ║ │                      │
+│ ║ ── Block 1: Vessel Ops Grid ──                ║ │                      │
+│ ║   Vessel  · Crane                             ║ │                      │
+│ ║   STS Slot · Mooring Team                     ║ │                      │
+│ ║   ETA     · Surveyor                          ║ │                      │
+│ ║   Anchor  · Est. Duration                     ║ │                      │
+│ ║                                               ║ │                      │
+│ ║ ── Block 2: Line Items Table ──               ║ │                      │
+│ ║   Item Layanan | Volume | Rate   | Jumlah     ║ │                      │
+│ ║   STS Fee      | 50k MT | $2.5/t | $125,000   ║ │                      │
+│ ║   Biaya Jasa…  |   —    |   —    |    —       ║ │                      │
+│ ║                          Subtotal | $125,000  ║ │                      │
+│ ║                          PPn 11%  | $13,750   ║ │                      │
+│ ║                ══════════ Total   | $138,750  ║ │                      │
+│ ║                         (bold + text-[#0F2A4D])║ │                      │
+│ ║                                               ║ │                      │
+│ ║ ── Block 3: Instruksi Pembayaran (amber box) ─║ │                      │
+│ ║   ┌─ bg-amber-50 border-amber-200 ──────────┐ ║ │                      │
+│ ║   │ Bank: BNI      │ Kode Bayar: TBK-…(mono)│ ║ │                      │
+│ ║   │ No Rek: 1234…  │ Batas: 5 Mar (3 hari)  │ ║ │                      │
+│ ║   │   (bold+mono)  │         (rose-700)      │ ║ │                      │
+│ ║   │ Atas Nama: …   │ Total: $138,750 (bold)  │ ║ │                      │
+│ ║   │   (bold)       │         (navy)           │ ║ │                      │
+│ ║   └────────────────────────────────────────-─┘ ║ │                      │
+│ ╚═══════════════════════════════════════════════╝ │                      │
+│                                                   │                      │
+│ [Section] Riwayat Pembayaran                      │                      │
+│  Per attempt: nominal, file, outcome, reason      │                      │
+│                                                   │                      │
+│ [Info banner — jika applicable]                   │                      │
+│  "Sisa pembayaran telah ditagihkan via Invoice    │                      │
+│   [Lihat Invoice →]"                              │                      │
+└───────────────────────────────────────────────────┴──────────────────────┘
 ```
 
-### 5.1 Status Banner per Status
+> **Komponen utama:** Detail Tagihan sekarang pakai **Invoice Detail Card** dari design system §3.2 (v1.3). Card ini menggantikan tiga section lama (Detail Tagihan + Bank Tujuan dipisah). Block 3 (Payment Instruction Box) hanya tampil saat status = `UNPAID` atau `PAYMENT_REJECT` (saat customer butuh transfer). Saat `WAITING_PAYMENT_VERIFICATION` / `PAID`, block 3 disembunyikan agar tidak menyesatkan customer.
+
+#### Invoice Detail Card — Block 2 (Line Items) — spesifikasi exact
+
+Tabel 4 kolom: **Item Layanan** (left-aligned) | **Volume** (center) | **Rate** (center) | **Jumlah** (right-aligned).
+
+`<tfoot>` terdiri dari 3 baris stacked:
+- **Subtotal** — label muted, amount right-aligned.
+- **PPn ({vat_rate × 100}%)** — label muted, amount right-aligned.
+- **Total** — label `font-semibold text-[#0F2A4D]`, amount `font-bold text-[#0F2A4D] text-base`. Baris ini diberi top-border `border-t-2 border-[#0F2A4D]` untuk penekanan visual.
+
+#### Invoice Detail Card — Block 3 (Instruksi Pembayaran) — spesifikasi exact
+
+Box `bg-amber-50 border border-amber-200 rounded-xl p-4`. Header: teks bold "Instruksi Pembayaran" + ikon `<CreditCard />` di kiri — `text-amber-900 font-semibold text-sm mb-3`.
+
+Isi box layout **2-column grid** (`grid-cols-2 gap-x-6 gap-y-2`):
+
+| Posisi | Label | Value |
+|---|---|---|
+| Col-1, Row-1 | Bank | `bank_info.bank_name` (normal) |
+| Col-2, Row-1 | Kode Bayar | `bank_info.kode_bayar` (`font-mono font-semibold text-amber-900`) |
+| Col-1, Row-2 | No Rekening | `bank_info.account_number` (`font-mono font-bold text-slate-900`) |
+| Col-2, Row-2 | Batas Pembayaran | formatted + countdown — ≤3 hari `text-rose-700 font-semibold`, 4–7 hari `text-amber-800`, >7 hari normal |
+| Col-1, Row-3 | Atas Nama | `bank_info.account_holder` (`font-semibold text-slate-900`) |
+| Col-2, Row-3 | Total | `formatCurrency(total_amount, currency)` — `font-bold text-[#0F2A4D] text-base` |
+
+Label styling: `text-xs text-amber-700 uppercase tracking-wide`. Value rendering sesuai kolom masing-masing.
+
+### 5.0 Header & Download Action
+
+Page header:
+- `EPB-{epb_number}` (mono, text-2xl font-bold) — kanan: status badge.
+- Sub-header: "Ref Nominasi {nomination_number}" — muted.
+- Action row di header kanan: **tombol "Download EPB PDF"** (`<Download />` icon, variant outline) — selalu tampil di semua status (FR-EI-12).
+
+Download click → `GET /api/customer/epb-payments/:id/document` (open di tab baru atau trigger browser download). Saat error: toast "Dokumen EPB belum tersedia. Coba lagi nanti." Saat `epb_pdf_url` null di response detail: tombol disabled + tooltip "Dokumen sedang dipersiapkan oleh STS."
+
+### 5.1 Detail Nominasi Section (v3.5 — selalu tampil)
+
+Section Card (judul "Detail Nominasi") tampil **selalu** di semua status — bukan kondisional. Data bersumber dari JOIN `nominations` + tabel vessel terkait di endpoint `GET /api/customer/epb-payments/:id`.
+
+```
+┌── Detail Nominasi ──────────────────────────────────────┐
+│  Kapal          MV Pacific Glory   ETA          09 Mei 2026 15:24  │
+│  Tipe Kapal     Cement Carrier     Agen         PT Samudera Indonesia │
+│  Jenis Cargo    Semen              Charterer    PT Semen Gresik        │
+│  Towage Plan    1 Tugboat          Dibuat       13 Apr 2026 15:24      │
+│                                    Diperbarui   09 Mei 2026 01:29      │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Layout:** `<dl>` grid `grid-cols-2 gap-x-8 gap-y-3`. Urutan field:
+
+| Posisi | Label | Source field |
+|---|---|---|
+| Col-1, Row-1 | Kapal | `nomination_data.vessel_name` |
+| Col-2, Row-1 | ETA | `nomination_data.eta` (format: dd MMM yyyy HH:mm) |
+| Col-1, Row-2 | Tipe Kapal | `nomination_data.vessel_type` |
+| Col-2, Row-2 | Agen | `nomination_data.agent_name` |
+| Col-1, Row-3 | Jenis Cargo | `nomination_data.cargo_type` |
+| Col-2, Row-3 | Charterer | `nomination_data.charterer` |
+| Col-1, Row-4 | Towage Plan | `nomination_data.towage_plan` |
+| Col-2, Row-4 | Dibuat | `nomination_data.created_at` (format: dd MMM yyyy HH:mm) |
+| — (kosong) | — | — |
+| Col-2, Row-5 | Diperbarui | `nomination_data.updated_at` (format: dd MMM yyyy HH:mm) |
+
+**Styling per item:** `<dt>` → `text-xs font-medium text-slate-500 uppercase tracking-wide`. `<dd>` → `text-sm text-slate-900 mt-0.5`. Nilai null/undefined → tampilkan "—" muted.
+
+**Fallback:** jika `nomination_data` null dari API → sembunyikan section (tidak broken; edge case nominasi legacy sebelum JOIN tersedia).
+
+---
+
+### 5.2 Status Banner per Status
 
 | Status | Banner variant | Heading | Body |
 |---|---|---|---|
@@ -143,7 +241,7 @@ Ref Nominasi NOM-20260430-00008  ·  MV Nusantara Star
 | Lunas (tanpa shortfall) | Confirmed | "EPB Lunas" | "Pembayaran telah diverifikasi pada {date}. Voyage dapat dimulai." |
 | Lunas (dengan shortfall) | Confirmed | "EPB Lunas" | "Pembayaran telah diverifikasi pada {date}. Sisa pembayaran Rp {shortfall} telah ditagihkan via Invoice. [Lihat Invoice →]" |
 
-### 5.2 Aksi Card (kontextual)
+### 5.3 Aksi Card (kontextual)
 
 **Belum Dibayar (Bayar flow):**
 - Section header "Bayar EPB"
@@ -166,7 +264,7 @@ Ref Nominasi NOM-20260430-00008  ·  MV Nusantara Star
 
 **Menunggu Verifikasi / Lunas:** Action card tidak tampil.
 
-### 5.3 Riwayat Pembayaran
+### 5.4 Riwayat Pembayaran
 
 List vertikal nested card per attempt:
 
@@ -186,7 +284,7 @@ List vertikal nested card per attempt:
 
 Setiap attempt: nested card `rounded-xl border bg-slate-50/40 p-4`. Status badge attempt kanan-atas. Field `paid_amount` di-display per attempt (snapshot). Reason hanya tampil saat ditolak.
 
-### 5.4 Cross-link ke Invoice (Lunas dengan shortfall)
+### 5.5 Cross-link ke Invoice (Lunas dengan shortfall)
 
 Saat status `Lunas` dan `paid_amount < total_amount`, tampilkan info banner di bawah Section Detail Tagihan:
 
@@ -209,17 +307,22 @@ Saat status `Lunas` dan `paid_amount < total_amount`, tampilkan info banner di b
 
 | Component (dari design system) | Dipakai di |
 |---|---|
-| Section Card | Semua section di list & detail |
+| Section Card | List page; **Detail Nominasi** (selalu tampil); Riwayat Pembayaran di detail |
 | **Tabs underline (large, primary nav)** | Top tabs EPB / Invoice |
 | **Tabs underline (filter)** | List filter (4 tabs) |
 | **KPI Filter Pill** (§3.1) | List page atas tabs |
 | Status Badge | Table column, detail header |
 | Status Banner | Top of detail page |
+| **Detail Nominasi grid** (`<dl>` 2-col, §5.1) | Detail page — selalu tampil, data dari `nomination_data` JOIN |
+| **Invoice Detail Card** (§3.2 v1.3) | Detail page — menggantikan section Detail Tagihan + Bank Tujuan |
+| **Line Items Table** (§3.2 v1.3) | Block 2 dalam Invoice Detail Card |
+| **Payment Instruction Box** (§3.2 v1.3) | Block 3 dalam Invoice Detail Card (kondisional) |
 | **Overdue Date Display** (§3.1) | Table jatuh tempo column |
 | **Inline Info Banner** (§3.1) | Cross-link ke Invoice |
 | Data Table | List page |
 | File upload dropzone | Aksi card (Bayar & Revisi Data) |
-| Input numeric (IDR format) | Nominal Pembayaran field |
+| Input numeric (IDR/USD format) | Nominal Pembayaran field |
+| Button outline + Download icon | Tombol "Download EPB PDF" di header |
 | Timeline (custom) | Right col status timeline |
 | Document item pattern | Proof file display di history |
 | Empty state | List kosong / filter tidak match |
@@ -238,6 +341,12 @@ Saat status `Lunas` dan `paid_amount < total_amount`, tampilkan info banner di b
 | Kurs USD→IDR stale/unavailable | Fallback `MIN_PAYMENT_IDR_FALLBACK`. Helper text update: "Minimum: Rp {fallback}." |
 | EPB Lunas dengan shortfall | Banner status update + inline info banner di Detail Tagihan + notification + link ke Invoice. |
 | EPB list kosong | Empty state full card: icon Receipt + "Belum ada EPB. Akan muncul setelah nominasi Anda disetujui." |
+| EPB legacy tanpa invoice-style data (`line_items` kosong / `vessel_ops` null) | Invoice Detail Card render **fallback minimal**: Block 1 disembunyikan, Block 2 hanya baris ringkasan (label: "Total Tagihan EPB" + amount + currency), Block 3 tampil dengan field yang ada saja. Tidak boleh broken/kosong. |
+| `nomination_data` null (legacy EPB sebelum JOIN tersedia) | Section "Detail Nominasi" disembunyikan — tidak broken, tidak menampilkan section kosong. |
+| `epb_pdf_url` null (STS belum upload dokumen) | Tombol "Download EPB PDF" disabled, tooltip "Dokumen sedang dipersiapkan oleh STS." |
+| Currency = USD | Render seluruh amount via `Intl.NumberFormat('en-US', { style:'currency', currency:'USD' })`. Minimum partial payment = 1 USD (tanpa konversi). |
+| Currency = IDR | Render via `Intl.NumberFormat('id-ID', { style:'currency', currency:'IDR', maximumFractionDigits:0 })`. Minimum = 1 USD × USD_IDR_RATE (atau fallback `MIN_PAYMENT_IDR_FALLBACK`). |
+| Batas Pembayaran ≤ 3 hari | Payment Instruction Box: field "Batas Pembayaran" pakai `text-rose-700` + "(X hari)". Saat overdue: "Lewat X hari" + Overdue Date Display pattern. |
 
 ---
 

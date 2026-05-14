@@ -2,6 +2,10 @@
 
 > **v3.3:** Scope module ini sekarang **EPB only**. Spesifikasi Invoice (settlement) ada di [`module/invoice/specifications.md`](../invoice/specifications.md).
 
+> **v3.4:** Detail EPB diperluas ke invoice-style. Data tambahan (vessel ops, line items, ppn, bank info, kode bayar, pdf_url) **disimpan di tabel `nomination_epb` (owned by M9)**, bukan di `epb_payments`. M9b API detail melakukan JOIN `epb_payments` ⋈ `nomination_epb` untuk mereturn payload lengkap. Tambah endpoint proxy Download EPB PDF.
+
+> **v3.5:** Endpoint `GET /api/customer/epb-payments/:id` diperluas dengan field `nomination_data` — JOIN ke tabel `nominations` untuk menampilkan data nominasi induk (vessel_name, vessel_type, cargo_type, towage_plan, eta, agent_name, charterer, created_at, updated_at) di section "Detail Nominasi" pada halaman EPB detail. Tambah FR-EI-13.
+
 ## 1. Payment Status Lifecycle
 
 ```
@@ -222,7 +226,80 @@ Response:
 
 ### Endpoint: GET /api/customer/epb-payments/:id
 
-Returns full detail of a single EPB payment including all proof upload attempts.
+Returns full detail of a single EPB payment including all proof upload attempts, **invoice-style data dari `nomination_epb` (JOIN)**, dan **nomination data dari `nominations` (JOIN)**. Query melakukan tiga-tabel JOIN: `epb_payments` ⋈ `nomination_epb` ⋈ `nominations`.
+
+Response (v3.4):
+```json
+{
+  "id": "uuid",
+  "nomination_id": "uuid",
+  "nomination_number": "NOM-20260430-00008",
+  "epb_number": "EPB-20260430-00008",
+  "status": "UNPAID",
+  "total_amount": 138750.00,
+  "paid_amount": null,
+  "currency": "USD",
+  "due_date": "2026-03-05T23:59:59Z",
+  "is_overdue": false,
+  "rejection_reason": null,
+  "confirmed_at": null,
+
+  // ── Nomination data (dari nominations JOIN, v3.5) ──
+  "nomination_data": {
+    "vessel_name":   "MV Pacific Glory",
+    "vessel_type":   "Cement Carrier",
+    "cargo_type":    "Semen",
+    "towage_plan":   "1 Tugboat",
+    "eta":           "2026-05-09T15:24:00+07:00",
+    "agent_name":    "PT Samudera Indonesia",
+    "charterer":     "PT Semen Gresik",
+    "created_at":    "2026-04-13T15:24:00+07:00",
+    "updated_at":    "2026-05-09T01:29:00+07:00"
+  },
+
+  // ── Invoice-style data (dari nomination_epb, owned by M9) ──
+  "vessel_ops": {
+    "vessel_name": "MV Pacific Star",
+    "crane": "Crane 2",
+    "sts_slot": "STS-202603-001",
+    "mooring_team": "Team Alpha",
+    "eta": "2026-03-12T14:00:00Z",
+    "surveyor": "PT Sucofindo",
+    "anchor": "Anchor 3",
+    "est_duration_hours": 24
+  },
+  "line_items": [
+    { "label": "STS Fee",            "volume": "50,000 MT", "rate": "$2.50/ton", "amount": 125000.00 },
+    { "label": "Biaya Jasa Tambahan", "volume": null,        "rate": null,        "amount": 0.00 }
+  ],
+  "subtotal": 125000.00,
+  "vat_rate": 0.11,
+  "vat_amount": 13750.00,
+  "bank_info": {
+    "bank_name": "BNI",
+    "account_number": "1234567890",
+    "account_holder": "PT Tata Bumi Khatulistiwa",
+    "kode_bayar": "TBK-202603-001"
+  },
+  "epb_pdf_url": "https://sts.example.com/epb/EPB-20260430-00008.pdf",  // proxied via /api/customer/epb-payments/:id/document
+
+  // ── Proof history ──
+  "proofs": [ /* … */ ],
+  "updated_at": "..."
+}
+```
+
+**Catatan field opsional:** Jika STS belum mengirim payload extended (legacy nominasi sebelum v3.4 STS), field `vessel_ops` / `line_items` / `bank_info` / `epb_pdf_url` boleh `null`. UI harus graceful fallback ke tampilan minimal lama.
+
+### Endpoint: GET /api/customer/epb-payments/:id/document (v3.4)
+
+**Auth:** Customer JWT. Guard: epb_payment milik authenticated customer.
+
+Proxy endpoint untuk men-stream PDF EPB resmi dari STS. LPS fetch dari `nomination_epb.epb_pdf_url` (server-side; URL STS tidak diekspos langsung ke browser untuk menjaga auth STS).
+
+- 200: stream `application/pdf` dengan header `Content-Disposition: attachment; filename="EPB-{epb_number}.pdf"`.
+- 404: jika `epb_pdf_url` null atau STS return 404.
+- 502: jika STS unreachable. UI tampilkan toast error "Dokumen EPB belum tersedia. Coba lagi nanti."
 
 ### Endpoint: GET /api/customer/epb-payments/summary
 
@@ -242,7 +319,8 @@ Returns aggregated counts per kategori (untuk KPI Filter Pill):
 |--------|------|-------------|------|
 | GET | /api/customer/epb-payments | List all EPB for customer | Customer JWT |
 | GET | /api/customer/epb-payments/summary | Aggregated counts per kategori | Customer JWT |
-| GET | /api/customer/epb-payments/:id | EPB detail + proof history | Customer JWT |
+| GET | /api/customer/epb-payments/:id | EPB detail + invoice-style data + proof history | Customer JWT |
+| GET | /api/customer/epb-payments/:id/document | Proxy stream PDF EPB resmi dari STS | Customer JWT |
 | POST | /api/customer/epb-payments/:id/proof | Upload payment proof (Bayar flow: UNPAID, atau Revisi Data: PAYMENT_REJECT) | Customer JWT |
 | POST | /api/webhooks/sts/epb-payment-status | Receive STS webhook (EPB_PAYMENT_REJECT, EPB_PAID, EPB_SHORTFALL_DETECTED) | HMAC |
 

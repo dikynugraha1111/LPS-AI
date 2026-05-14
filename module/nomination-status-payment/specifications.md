@@ -2,6 +2,8 @@
 
 > **Scope revision (BRD v3.1):** M9 ends at the moment the customer submits the first proof of payment. The full payment lifecycle (Pending Review → Payment Reject → Paid) is out of M9 scope — it belongs to M9b (EPB & Invoice).
 
+> **Update v3.4:** Tabel `nomination_epb` diperluas dengan field invoice-style (vessel ops, line items, ppn, bank info, kode bayar, pdf_url). M9 detail page menampilkan **preview** invoice-style EPB + button Download EPB PDF. Data ditulis ke `nomination_epb` saat webhook APPROVED diterima.
+
 ## 1. Nomination Status Lifecycle (M9 portion)
 
 ```
@@ -26,7 +28,7 @@ Statuses mirrored from **M9b** (`epb_payments` table): `UNPAID` (tidak ada padan
 ### Endpoint: POST /api/webhooks/sts/nomination-status
 **Auth:** HMAC-SHA256 signature in `X-STS-Signature` header (shared secret).
 
-**Payload:**
+**Payload (v3.4):**
 ```json
 {
   "lps_nomination_id": "uuid",
@@ -37,18 +39,47 @@ Statuses mirrored from **M9b** (`epb_payments` table): `UNPAID` (tidak ada padan
     // For APPROVED:
     "anchor_point": "AP-3",
     "etb": "2026-05-02T06:00:00Z",
-    "estimated_duration_hours": 36,
+    "estimated_duration_hours": 24,
     "epb": {
-      "epb_number": "EPB-2026-0042",
-      "amount": 15000000.00,
-      "currency": "IDR",
-      "due_date": "2026-04-30T23:59:59Z"
+      "epb_number": "EPB-20260430-00008",
+      "currency": "USD",                            // 'IDR' atau 'USD'
+      "due_date": "2026-03-05T23:59:59Z",
+
+      // ── Invoice-style data (v3.4) ──
+      "vessel_ops": {
+        "vessel_name": "MV Pacific Star",
+        "crane": "Crane 2",
+        "sts_slot": "STS-202603-001",
+        "mooring_team": "Team Alpha",
+        "eta": "2026-03-12T14:00:00Z",
+        "surveyor": "PT Sucofindo",
+        "anchor": "Anchor 3",
+        "est_duration_hours": 24
+      },
+      "line_items": [
+        { "label": "STS Fee",            "volume": "50,000 MT", "rate": "$2.50/ton", "amount": 125000.00 },
+        { "label": "Biaya Jasa Tambahan", "volume": null,        "rate": null,        "amount": 0.00 }
+      ],
+      "subtotal": 125000.00,
+      "vat_rate": 0.11,
+      "vat_amount": 13750.00,
+      "total_amount": 138750.00,                    // = subtotal + vat_amount
+
+      "bank_info": {
+        "bank_name": "BNI",
+        "account_number": "1234567890",
+        "account_holder": "PT Tata Bumi Khatulistiwa",
+        "kode_bayar": "TBK-202603-001"
+      },
+      "epb_pdf_url": "https://sts.example.com/epb/EPB-20260430-00008.pdf"
     },
     // For NEED_REVISION:
     "revision_notes": "Dokumen Rencana Kerja tidak lengkap."
   }
 }
 ```
+
+**Backwards compatibility:** Field `vessel_ops`, `line_items`, `subtotal`, `vat_*`, `bank_info`, `epb_pdf_url` opsional dari sisi LPS — jika STS belum kirim, kolom NULL dan UI fallback ke tampilan minimal. Field `amount` lama (single total) tetap diterima sebagai alias `total_amount` saat field baru tidak hadir.
 
 **Processing:**
 1. Verify HMAC signature → reject with 401 if invalid.
@@ -95,16 +126,49 @@ ALTER TABLE nominations ADD COLUMN estimated_duration_hours INTEGER;
 ALTER TABLE nominations ADD COLUMN revision_notes TEXT;
 ALTER TABLE nominations ADD COLUMN sts_nomination_id VARCHAR(100);
 
--- EPB data received from STS Platform
+-- EPB data received from STS Platform (extended v3.4)
 CREATE TABLE nomination_epb (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    nomination_id   UUID NOT NULL REFERENCES nominations(id) ON DELETE CASCADE,
-    epb_number      VARCHAR(50) NOT NULL UNIQUE,
-    amount          DECIMAL(20,2) NOT NULL,
-    currency        VARCHAR(10) NOT NULL DEFAULT 'IDR',
-    due_date        TIMESTAMPTZ,
-    received_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+    id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nomination_id      UUID NOT NULL REFERENCES nominations(id) ON DELETE CASCADE,
+    epb_number         VARCHAR(50) NOT NULL UNIQUE,
+    -- Kalkulasi
+    subtotal           NUMERIC(20,2),                -- v3.4 (NULL untuk legacy)
+    vat_rate           NUMERIC(5,4) DEFAULT 0.11,    -- v3.4
+    vat_amount         NUMERIC(20,2),                -- v3.4
+    total_amount       NUMERIC(20,2) NOT NULL,       -- = subtotal + vat_amount (atau legacy 'amount')
+    currency           VARCHAR(10) NOT NULL DEFAULT 'IDR',
+    due_date           TIMESTAMPTZ,
+    -- Operasional voyage (v3.4)
+    vessel_name        VARCHAR(255),
+    crane              VARCHAR(50),
+    sts_slot           VARCHAR(50),
+    mooring_team       VARCHAR(100),
+    eta                TIMESTAMPTZ,
+    surveyor           VARCHAR(255),
+    anchor             VARCHAR(50),
+    est_duration_hours INTEGER,
+    -- Bank instruction (v3.4)
+    bank_name          VARCHAR(100),
+    bank_account_no    VARCHAR(50),
+    bank_account_holder VARCHAR(255),
+    kode_bayar         VARCHAR(100),
+    -- Dokumen (v3.4)
+    epb_pdf_url        TEXT,
+    -- Audit
+    received_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Line items per EPB (v3.4)
+CREATE TABLE nomination_epb_line_items (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    epb_id        UUID NOT NULL REFERENCES nomination_epb(id) ON DELETE CASCADE,
+    label         VARCHAR(255) NOT NULL,       -- e.g. "STS Fee", "Biaya Jasa Tambahan"
+    volume        VARCHAR(50),                  -- string display (e.g. "50,000 MT")
+    rate          VARCHAR(50),                  -- string display (e.g. "$2.50/ton")
+    amount        NUMERIC(20,2) NOT NULL,
+    sort_order    INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX idx_epb_line_items_epb_id ON nomination_epb_line_items(epb_id);
 
 -- Immutable status change history (shared with M9b)
 CREATE TABLE nomination_status_history (

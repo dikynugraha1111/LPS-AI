@@ -1,10 +1,14 @@
 # BRD Modul M9b — EPB (Customer Portal)
 
 **Kategori:** Customer Portal  
-**Versi BRD:** 3.3  
+**Versi BRD:** 3.5  
 **Tanggal Update:** Mei 2026  
 **Status Implementasi:** Replit handoff tersedia — [`m9b-epb-invoice.md`](../../implementation/replit-handoff/m9b-epb-invoice.md)  
 **Sumber:** [BRD Utama — Section 2.1 (9b) & 3.4.9b](../BRD-LPS-V3-Analysis.md)
+
+> **Catatan v3.5:** Halaman Detail EPB diperluas dengan section **"Detail Nominasi"** yang selalu tampil — menampilkan data induk nominasi (Kapal, Tipe Kapal, Jenis Cargo, Towage Plan, ETA, Agen, Charterer, Dibuat, Diperbarui) dari JOIN ke tabel `nominations`. Spesifikasi Payment Instruction Box (Block 3) dipertegas: 2-column grid di dalam box amber, Total di-highlight bold + navy. Tambah FR-EI-13.
+
+> **Catatan v3.4:** Detail Tagihan EPB diperluas menjadi **invoice-style display** — vessel operasional info, line items breakdown (volume/rate/jumlah), kalkulasi subtotal/PPn 11%/total, dan instruksi pembayaran lengkap (bank, no rekening, atas nama, kode bayar, batas pembayaran). Tambah aksi **Download EPB PDF**. Currency support multi-currency (IDR / USD). Sumber data: STS webhook APPROVED dengan field tambahan (`vessel_ops`, `line_items[]`, `subtotal`, `vat_amount`, `bank_info`, `kode_bayar`, `epb_pdf_url`). Tambah FR-EI-11 dan FR-EI-12.
 
 > **Catatan v3.3:** M9b sebelumnya bernama "EPB & Invoice" dengan scope gabungan. Mulai BRD v3.3, scope M9b adalah **EPB only**. Bagian Invoice dipisah menjadi modul baru: [M9c — Invoice](m9c-invoice.md). UI keduanya tetap dalam satu menu "EPB & Invoice" di sidebar Customer Portal, namun dengan tab internal terpisah (EPB / Invoice). Backend dan struktur module dipisah penuh.
 
@@ -48,6 +52,26 @@ Belum Dibayar
 - STS Platform menentukan apakah pembayaran tersebut diterima (Lunas) atau ditolak.
 - Saat status EPB = Lunas dengan `paid_amount < total_amount`, STS Platform mengirim webhook `EPB_SHORTFALL_DETECTED` yang men-trigger pembuatan record Invoice di M9c dengan source `EPB_SHORTFALL` dan amount = shortfall.
 
+### Data EPB yang Ditampilkan (Invoice-style, v3.4)
+
+Detail Tagihan EPB menampilkan field berikut, seluruhnya bersumber dari STS Platform (read-only):
+
+| Kelompok | Field |
+|---|---|
+| **Identitas** | Nomor EPB, No. Nominasi |
+| **Operasional Voyage** | Vessel, Crane, STS Slot, Mooring Team, ETA, Surveyor, Anchor, Est. Duration |
+| **Line Items** | Item Layanan, Volume, Rate, Jumlah (minimal satu baris STS Fee; baris tambahan per service key Additional Service) |
+| **Kalkulasi** | Subtotal, PPn 11%, Total |
+| **Instruksi Pembayaran** | Bank, No Rekening, Atas Nama, Kode Bayar, Batas Pembayaran (dengan indikator sisa hari) |
+| **Dokumen** | URL PDF EPB resmi (`epb_pdf_url`) |
+
+**Currency support:** EPB dapat diterbitkan dalam IDR atau USD (ditentukan STS per nominasi). UI render sesuai field `currency` dari payload. Validasi minimum partial payment tetap 1 USD ekuivalen (pakai `USD_IDR_RATE` saat currency = IDR).
+
+### Aksi Customer di Detail EPB
+
+- **Download EPB PDF:** tersedia di semua status. File di-stream LPS dari STS via proxy endpoint (LPS tidak generate PDF).
+- **Bayar / Revisi Data:** kontextual sesuai status (lihat flow di atas).
+
 ### STS Webhook yang Ditangani M9b
 
 | Event | Aksi LPS |
@@ -82,6 +106,9 @@ Belum Dibayar
 | FR-EI-08 | Sistem harus mengirimkan data bukti pembayaran beserta nominal yang dibayarkan (`paid_amount`) ke STS Platform via API untuk proses verifikasi | System |
 | FR-EI-09 | Setelah customer berhasil upload bukti pembayaran, sistem harus mengupdate status nominasi terkait di M9 menjadi "Waiting Payment Verification" secara bersamaan dalam satu transaksi | System |
 | FR-EI-10 | Customer harus dapat membayar EPB secara parsial (paid_amount < total_amount), dengan nominal minimum **1 USD ekuivalen IDR**. Saat status EPB berubah ke Lunas dengan paid_amount < total_amount, STS Platform mengirim webhook `EPB_SHORTFALL_DETECTED` yang men-trigger pembuatan record Invoice di M9c dengan source `EPB_SHORTFALL` dan amount = shortfall | System |
+| FR-EI-11 | Halaman Detail EPB harus menampilkan **invoice-style detail tagihan** mencakup: (a) data operasional voyage (Vessel, Crane, STS Slot, Mooring Team, ETA, Surveyor, Anchor, Est. Duration); (b) line items table (Item Layanan, Volume, Rate, Jumlah) dengan Subtotal + PPn 11% + Total (currency mengikuti field `currency` dari STS); (c) instruksi pembayaran (Bank, No Rekening, Atas Nama, Kode Bayar, Batas Pembayaran dengan indikator sisa hari, warning bila ≤ 3 hari). Seluruh data read-only dari STS via webhook APPROVED | Customer |
+| FR-EI-12 | Customer harus dapat mengunduh dokumen EPB resmi (PDF) melalui tombol **"Download EPB PDF"** yang tersedia di semua status. File di-stream LPS dari `epb_pdf_url` STS via proxy endpoint; LPS tidak generate PDF mandiri | Customer |
+| FR-EI-13 | Halaman Detail EPB harus menampilkan section **"Detail Nominasi"** yang selalu tampil di semua status, berisi data nominasi induk berikut: Kapal (vessel_name), Tipe Kapal (vessel_type), Jenis Cargo (cargo_type), Towage Plan (towage_plan), ETA, Agen (agent_name), Charterer, Dibuat (created_at nominasi), Diperbarui (updated_at nominasi). Data bersumber dari JOIN `nominations` di endpoint `GET /api/customer/epb-payments/:id` — bukan data duplikasi | Customer |
 
 ---
 

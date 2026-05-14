@@ -1,10 +1,12 @@
 # Replit Handoff — M9b: EPB (Customer Portal)
 
-**Version:** 2.0 (v3.3 split — EPB only, partial payment)
+**Version:** 2.2 (v3.5 — Detail Nominasi section + Payment Instruction Box exact spec)
 
 > **Version history:**
 > - **v1.0** — 2026-05-07: Initial M9b handoff (gabungan EPB & Invoice scope, no partial payment).
 > - **v2.0** — 2026-05-13: Split M9b → EPB only. Invoice (settlement) pindah ke M9c. Tambah partial payment (min 1 USD ekuivalen IDR). Status labels disinkronkan ke Bahasa Indonesia natural. Route berubah dari `/customer/epb-invoice` → `/customer/billing/epb`. Webhook `EPB_SHORTFALL_DETECTED` ditambah untuk trigger Invoice creation di M9c.
+> - **v2.1** — 2026-05-14: Detail Tagihan diupgrade ke **invoice-style** (Invoice Detail Card dari design system §3.2 v1.3 — Vessel Ops Grid + Line Items Table + Payment Instruction Box). Data tambahan dibaca dari `nomination_epb` (extended di M9 v2.1) lewat JOIN di endpoint detail. Tombol **Download EPB PDF** di header (FR-EI-12) — proxy ke STS via `GET /api/customer/epb-payments/:id/document`. Multi-currency support (IDR/USD) via `Intl.NumberFormat`. Fallback minimal untuk EPB legacy tanpa data extended.
+> - **v2.2** — 2026-05-14: Tambah section **"Detail Nominasi"** di halaman EPB detail (FR-EI-13) — selalu tampil, menampilkan data nominasi induk (Kapal, Tipe Kapal, Jenis Cargo, Towage Plan, ETA, Agen, Charterer, Dibuat, Diperbarui) dari JOIN `nominations`. API endpoint `GET /api/customer/epb-payments/:id` diperluas dengan field `nomination_data`. Spesifikasi Block 3 (Payment Instruction Box) dipertegas: 2-column grid, Total bold + navy.
 
 ## Context
 
@@ -32,8 +34,8 @@ UI berada di tab **"EPB"** dalam menu "EPB & Invoice" di sidebar Customer Portal
 
 Sebelum menulis UI apapun, **wajib** baca:
 
-1. **Design system master:** [`implementation/design/lps-design-system.md`](../design/lps-design-system.md) — v1.2 (status label sync, KPI Filter Pill, Overdue Date Display, Inline Info Banner).
-2. **Per-modul UI design:** [`implementation/design/m9b-epb-invoice-ui.md`](../design/m9b-epb-invoice-ui.md) — list page dengan KPI pills + tabs filter, detail page 2-column, status banner per 4 payment status, **Bayar form dengan nominal input + validasi partial payment**, cross-link ke Invoice saat shortfall.
+1. **Design system master:** [`implementation/design/lps-design-system.md`](../design/lps-design-system.md) — v1.3 (Invoice Detail Card + Line Items Table + Payment Instruction Box, multi-currency).
+2. **Per-modul UI design:** [`implementation/design/m9b-epb-invoice-ui.md`](../design/m9b-epb-invoice-ui.md) — list page dengan KPI pills + tabs filter, **detail page pakai Invoice Detail Card (3 blok: Vessel Ops Grid + Line Items Table + Payment Instruction Box)**, status banner per 4 payment status, **Bayar form dengan nominal input + validasi partial payment**, **tombol Download EPB PDF di header**, cross-link ke Invoice saat shortfall.
 
 **Surface:** A — Customer Portal (Bahasa Indonesia).
 
@@ -284,8 +286,36 @@ WHERE n.customer_id = $1
 
 ### GET /api/customer/epb-payments/:id
 
-Full detail: EPB record + all proof attempts (DESC by uploaded_at).
+Full detail: EPB record + all proof attempts (DESC by uploaded_at) + nomination data + invoice-style data.
 Guard: customer_id check via JOIN to nominations.
+
+SQL (v2.2 — tiga-tabel JOIN):
+```sql
+SELECT
+  ep.*,
+  ne.epb_number, ne.vessel_name AS ops_vessel, ne.crane, ne.sts_slot,
+  ne.mooring_team, ne.eta AS ops_eta, ne.surveyor, ne.anchor,
+  ne.est_duration_hours, ne.subtotal, ne.vat_rate, ne.vat_amount,
+  ne.bank_name, ne.bank_account_no, ne.bank_account_holder, ne.kode_bayar,
+  ne.epb_pdf_url,
+  n.nomination_number, n.customer_id,
+  -- nomination_data fields (v2.2)
+  n.vessel_name,
+  n.vessel_type,
+  n.cargo_type,
+  n.towage_plan,
+  n.eta           AS nom_eta,
+  n.agent_name,
+  n.charterer,
+  n.created_at    AS nom_created_at,
+  n.updated_at    AS nom_updated_at
+FROM epb_payments ep
+JOIN nomination_epb ne ON ep.epb_id = ne.id
+JOIN nominations n ON ep.nomination_id = n.id
+WHERE ep.id = $1 AND n.customer_id = $2
+```
+
+Serialize `nomination_data` sebagai nested object di response JSON. `nomination_epb_line_items` di-fetch terpisah (SELECT WHERE epb_id = ne.id).
 
 ---
 
@@ -452,17 +482,154 @@ Action column conditional:
 
 ---
 
-## Step 9: Frontend — EPB Detail Page
+## Step 9: Frontend — EPB Detail Page (v2.1 invoice-style)
 
 File: `src/pages/customer/billing/EPBDetailPage.tsx`
 
 Layout 2-column (lihat m9b-epb-invoice-ui.md §5).
 
+**Detail data dari API** — `GET /api/customer/epb-payments/:id` mereturn payload extended (JOIN `nomination_epb` + `nominations`):
+- Identitas: `epb_number`, `nomination_number`, `status`, `total_amount`, `paid_amount`, `currency` (`IDR`/`USD`), `due_date`.
+- **Nomination data (v2.2, dari JOIN `nominations`):**
+  - `nomination_data` — `{ vessel_name, vessel_type, cargo_type, towage_plan, eta, agent_name, charterer, created_at, updated_at }`
+  - Nullable jika legacy; UI hide section kalau null.
+- Invoice-style data (optional, dari `nomination_epb`):
+  - `vessel_ops` — `{ vessel_name, crane, sts_slot, mooring_team, eta, surveyor, anchor, est_duration_hours }`
+  - `line_items[]` — `[{ label, volume, rate, amount }]`
+  - `subtotal`, `vat_rate`, `vat_amount`
+  - `bank_info` — `{ bank_name, account_number, account_holder, kode_bayar }`
+  - `epb_pdf_url`
+- `proofs[]` — riwayat upload attempt.
+
 Key sections:
-- **Status Banner** — switch by status with proper variant + copy.
-- **Detail Tagihan** — Total Amount, Paid Amount (jika ada), Currency, Due Date, Status. Jika Lunas dengan shortfall: tampilkan info banner amber + link ke `/customer/billing/invoice/:invoiceId` (resolved dari query).
-- **Bank Tujuan** — static config (system config keys `BANK_NAME`, `BANK_ACCOUNT_NUMBER`, `BANK_ACCOUNT_HOLDER`) atau dari STS API. Tombol copy-to-clipboard.
-- **Riwayat Pembayaran** — nested cards per attempt.
+- **Header bar:**
+  - Kiri: `EPB-{epb_number}` (text-2xl font-bold mono) + sub-text `Ref Nominasi {nomination_number}` muted.
+  - Kanan: `<StatusBadge>` + tombol `<Button variant="outline"><Download /> Download EPB PDF</Button>`.
+  - Download click: `window.open('/api/customer/epb-payments/'+id+'/document', '_blank')`. Jika `epb_pdf_url` null, disable tombol + tooltip "Dokumen sedang dipersiapkan oleh STS."
+- **Status Banner** — switch by status with proper variant + copy (tidak berubah dari v2.0).
+- **Section "Detail Nominasi" (v2.2 — selalu tampil, FR-EI-13):**
+  ```tsx
+  {data.nomination_data && (
+    <SectionCard title="Detail Nominasi">
+      <dl className="grid grid-cols-2 gap-x-8 gap-y-3">
+        {[
+          ["Kapal",       data.nomination_data.vessel_name],
+          ["ETA",         formatDateTime(data.nomination_data.eta)],
+          ["Tipe Kapal",  data.nomination_data.vessel_type],
+          ["Agen",        data.nomination_data.agent_name],
+          ["Jenis Cargo", data.nomination_data.cargo_type],
+          ["Charterer",   data.nomination_data.charterer],
+          ["Towage Plan", data.nomination_data.towage_plan],
+          ["Dibuat",      formatDateTime(data.nomination_data.created_at)],
+          [null, null],  // spacer — grid auto-flow keeps alignment
+          ["Diperbarui",  formatDateTime(data.nomination_data.updated_at)],
+        ].map(([label, value], i) => label ? (
+          <div key={i}>
+            <dt className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</dt>
+            <dd className="text-sm text-slate-900 mt-0.5">{value ?? "—"}</dd>
+          </div>
+        ) : <div key={i} />)}
+      </dl>
+    </SectionCard>
+  )}
+  ```
+  Jika `nomination_data` null → section tidak dirender (bukan section kosong).
+- **Invoice Detail Card** (komponen baru, menggantikan section Detail Tagihan + Bank Tujuan lama):
+  - **Block 1 — Vessel Ops Grid** (`<dl>` 2-col): render hanya jika `vessel_ops != null`. Field: Vessel, Crane, STS Slot, Mooring Team, ETA (formatted), Surveyor, Anchor, Est. Duration (`{n} jam`).
+  - **Block 2 — Line Items Table**: render hanya jika `line_items.length > 0`. Header: Item Layanan / Volume / Rate / Jumlah. Body row: nilai kosong → "—" `text-slate-400`. `<tfoot>`:
+    ```tsx
+    <tfoot>
+      <tr><td colSpan={3} className="text-right text-sm text-slate-500">Subtotal</td>
+          <td className="text-right text-sm">{formatCurrency(subtotal, currency)}</td></tr>
+      <tr><td colSpan={3} className="text-right text-sm text-slate-500">PPn ({Math.round(vat_rate*100)}%)</td>
+          <td className="text-right text-sm">{formatCurrency(vat_amount, currency)}</td></tr>
+      <tr className="border-t-2 border-[#0F2A4D]">
+          <td colSpan={3} className="text-right font-semibold text-[#0F2A4D]">Total</td>
+          <td className="text-right font-bold text-[#0F2A4D] text-base">{formatCurrency(total_amount, currency)}</td>
+      </tr>
+    </tfoot>
+    ```
+  - **Block 3 — Payment Instruction Box**: render hanya saat `status ∈ ['UNPAID', 'PAYMENT_REJECT']` AND `bank_info != null`.
+    ```tsx
+    <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 mt-4">
+      <div className="flex items-center gap-2 mb-3">
+        <CreditCard className="h-4 w-4 text-amber-700" />
+        <span className="text-sm font-semibold text-amber-900">Instruksi Pembayaran</span>
+      </div>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+        {/* Left col */}
+        <div>
+          <dt className="text-xs text-amber-700 uppercase tracking-wide">Bank</dt>
+          <dd className="text-sm text-slate-900">{bank_info.bank_name}</dd>
+        </div>
+        {/* Right col */}
+        <div>
+          <dt className="text-xs text-amber-700 uppercase tracking-wide">Kode Bayar</dt>
+          <dd className="font-mono font-semibold text-amber-900 text-sm">{bank_info.kode_bayar}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-amber-700 uppercase tracking-wide">No Rekening</dt>
+          <dd className="font-mono font-bold text-slate-900 text-sm">{bank_info.account_number}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-amber-700 uppercase tracking-wide">Batas Pembayaran</dt>
+          <dd className={`text-sm font-semibold ${countdown.tone === 'danger' ? 'text-rose-700' : countdown.tone === 'warning' ? 'text-amber-800' : 'text-slate-900'}`}>
+            {formatDate(due_date)} {countdown.label}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-amber-700 uppercase tracking-wide">Atas Nama</dt>
+          <dd className="font-semibold text-slate-900 text-sm">{bank_info.account_holder}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-amber-700 uppercase tracking-wide">Total</dt>
+          <dd className="font-bold text-[#0F2A4D] text-base">{formatCurrency(total_amount, currency)}</dd>
+        </div>
+      </div>
+    </div>
+    ```
+  - **Fallback minimal:** jika `vessel_ops`, `line_items`, `bank_info` semua null/empty → render single Section Card sederhana dengan Total Tagihan + Currency + Due Date (compat untuk EPB legacy).
+- **Riwayat Pembayaran** — nested cards per attempt (tidak berubah).
+- **Inline Info Banner cross-link** — sama dengan v2.0.
+
+### Currency formatter helper
+
+File: `src/lib/format.ts`
+
+```ts
+export function formatCurrency(amount: number, currency: 'IDR' | 'USD'): string {
+  if (currency === 'USD') {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  }
+  return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(amount);
+}
+
+export function dueDateCountdown(dueDate: string): { label: string; tone: 'danger' | 'warning' | 'neutral' } {
+  const days = Math.ceil((new Date(dueDate).getTime() - Date.now()) / 86400000);
+  if (days < 0)  return { label: `Lewat ${Math.abs(days)} hari`, tone: 'danger' };
+  if (days <= 3) return { label: `(${days} hari)`, tone: 'danger' };
+  if (days <= 7) return { label: `(${days} hari)`, tone: 'warning' };
+  return { label: '', tone: 'neutral' };
+}
+```
+
+### Download endpoint (backend, FR-EI-12)
+
+File: `internal/handlers/customer/epb_document.go`
+
+```go
+// GET /api/customer/epb-payments/:id/document
+func GetEPBDocument(c echo.Context) error {
+  // 1. Auth check: epb_payment milik customer auth.
+  // 2. Fetch epb_pdf_url dari nomination_epb (JOIN epb_payments).
+  // 3. Jika null → 404 dengan body { error: "pdf_unavailable" }.
+  // 4. Fetch STS dengan Authorization: Bearer STS_API_KEY (server-side).
+  // 5. Stream response body sebagai application/pdf dengan Content-Disposition attachment.
+  // 6. Pada error STS (timeout, 5xx) → 502 dengan retry hint.
+}
+```
+
+Catatan: jangan expose `epb_pdf_url` STS langsung ke browser (auth STS tidak boleh bocor + STS URL bisa berubah). Selalu lewat proxy.
 
 ### Bayar Form Component
 
@@ -526,9 +693,36 @@ await fetch(`/api/customer/epb-payments/${id}/proof`, { method: "POST", body: fd
 - [ ] Status badges pakai label v3.3: Belum Dibayar / Menunggu Verifikasi / Pembayaran Ditolak / Lunas.
 - [ ] Overdue indicator (rose + AlertTriangle) untuk due_date < now() dengan status != Lunas.
 - [ ] Aksi column row UNPAID: tombol "Bayar" + link "Lihat Detail →".
-- [ ] Detail page Bayar form: input nominal default ke total_amount tapi editable, helper text min/max, inline validation, IDR thousand separator.
+- [ ] Detail page header: status badge + tombol "Download EPB PDF" (outline + Download icon).
+- [ ] Detail page Invoice Detail Card: Block 1 Vessel Ops Grid (8 field, 2-col) render saat `vessel_ops != null`.
+- [ ] Detail page Invoice Detail Card: Block 2 Line Items Table dengan Subtotal / PPn (label dinamis) / Total (bold + `text-[#0F2A4D]`).
+- [ ] Detail page Invoice Detail Card: Block 3 Payment Instruction Box (amber tone, font-mono untuk Kode Bayar & No Rek) hanya tampil saat status UNPAID atau PAYMENT_REJECT.
+- [ ] Countdown indicator Batas Pembayaran: ≤3 hari rose-700, 4–7 hari amber-800, >7 hari netral.
+- [ ] Currency formatter: USD pakai `en-US` locale, IDR pakai `id-ID` locale; amount pakai `tabular-nums`.
+- [ ] Fallback minimal saat `vessel_ops`/`line_items`/`bank_info` null (legacy EPB) — tidak boleh broken.
+- [ ] Detail page Bayar form: input nominal default ke total_amount tapi editable, helper text min/max, inline validation, IDR/USD format sesuai currency.
 - [ ] Submit Bayar → status berubah ke Menunggu Verifikasi; action card hide.
 - [ ] Lunas dengan shortfall: info banner amber + link ke `/customer/billing/invoice/:id`.
-- [ ] Bank account card dengan copy-to-clipboard + toast.
+- [ ] Download EPB PDF: klik buka file di tab baru / trigger download. Disabled + tooltip saat `epb_pdf_url` null.
 - [ ] Riwayat Pembayaran nested cards dengan `paid_amount` per attempt + reason saat reject.
 - [ ] Empty state: list kosong / kategori kosong dengan copy yang sesuai.
+
+### Backend (v2.1 additions)
+- [ ] `GET /api/customer/epb-payments/:id` mereturn invoice-style payload (JOIN dengan `nomination_epb` + `nomination_epb_line_items`).
+- [ ] `GET /api/customer/epb-payments/:id/document` proxy stream PDF dari STS dengan Authorization Bearer (server-side). 404 saat `epb_pdf_url` null, 502 saat STS unreachable.
+- [ ] `currency` field di response = `IDR` atau `USD` sesuai data STS.
+- [ ] Min payment validation: saat `currency = USD`, threshold = 1 USD; saat `currency = IDR`, threshold = 1 × `USD_IDR_RATE`.
+
+### Backend (v2.2 additions)
+- [ ] `GET /api/customer/epb-payments/:id` melakukan JOIN 3-tabel: `epb_payments` ⋈ `nomination_epb` ⋈ `nominations`.
+- [ ] Response JSON menyertakan field `nomination_data` dengan: `vessel_name`, `vessel_type`, `cargo_type`, `towage_plan`, `eta` (sebagai `nom_eta`), `agent_name`, `charterer`, `created_at` (sebagai `nom_created_at`), `updated_at` (sebagai `nom_updated_at`).
+- [ ] `nomination_data` = `null` untuk EPB legacy (nullable, tidak error).
+
+### Frontend (v2.2 additions)
+- [ ] Section "Detail Nominasi" tampil di atas Invoice Detail Card (selalu, FR-EI-13).
+- [ ] Section disembunyikan (bukan section kosong) jika `nomination_data = null`.
+- [ ] Grid 2-column `dl`: Kapal, ETA | Tipe Kapal, Agen | Jenis Cargo, Charterer | Towage Plan, Dibuat | (spacer), Diperbarui.
+- [ ] DateTime formatter `formatDateTime` menampilkan format `dd MMM yyyy HH:mm` (WIB-aware).
+- [ ] Block 2 tfoot: baris Total pakai `border-t-2 border-[#0F2A4D]`, text `font-bold text-[#0F2A4D] text-base`.
+- [ ] Block 3 Payment Instruction Box: 2-column grid (Bank + Kode Bayar / No Rekening + Batas / Atas Nama + Total). Total: `font-bold text-[#0F2A4D]`. No Rek + Kode Bayar: `font-mono font-bold/semibold text-amber-900`.
+- [ ] Countdown Batas Pembayaran: ≤3 hari `text-rose-700 font-semibold`, 4–7 hari `text-amber-800`, >7 netral.

@@ -1,8 +1,10 @@
 # M9b — EPB (Customer Portal): Functional Requirements
 
-Derived from BRD Section 3.4.9b and Section 2.1 Module 9b (BRD v3.3).
+Derived from BRD Section 3.4.9b and Section 2.1 Module 9b (BRD v3.4).
 
 > **Scope note (v3.3):** Sejak v3.3, scope M9b adalah **EPB only**. Bagian Invoice (settlement) dipindahkan ke [M9c — Invoice](../invoice/requirements.md). M9b mengelola siklus pembayaran EPB termasuk partial payment (min 1 USD ekuivalen IDR).
+
+> **Scope note (v3.4):** Detail Tagihan diperluas ke **invoice-style** (vessel ops, line items, subtotal/PPn/total, instruksi pembayaran lengkap). Tambah FR-EI-11 dan FR-EI-12 untuk Download EPB PDF.
 
 | FR ID | Requirement | Actor | Priority |
 |-------|-------------|-------|----------|
@@ -16,6 +18,8 @@ Derived from BRD Section 3.4.9b and Section 2.1 Module 9b (BRD v3.3).
 | FR-EI-08 | Sistem harus mengirimkan data bukti pembayaran beserta nominal yang dibayarkan (`paid_amount`) ke STS Platform via API untuk proses verifikasi | System | Must Have |
 | FR-EI-09 | Setelah customer upload proof (FR-EI-03 atau FR-EI-05), sistem harus mengupdate `nominations.status` menjadi `WAITING_PAYMENT_VERIFICATION` secara bersamaan dengan `epb_payments.status` dalam satu transaksi DB | System | Must Have |
 | FR-EI-10 | Customer harus dapat membayar EPB secara parsial (paid_amount < total_amount), dengan nominal minimum **1 USD ekuivalen IDR**. Saat EPB Lunas dengan paid_amount < total_amount, STS mengirim webhook `EPB_SHORTFALL_DETECTED` yang men-trigger pembuatan record Invoice di M9c dengan source `EPB_SHORTFALL` dan amount = shortfall | System | Must Have |
+| FR-EI-11 | Halaman Detail EPB harus menampilkan **invoice-style detail tagihan**: (a) data operasional voyage (Vessel, Crane, STS Slot, Mooring Team, ETA, Surveyor, Anchor, Est. Duration); (b) line items (Item Layanan, Volume, Rate, Jumlah) dengan Subtotal + PPn 11% + Total (currency IDR/USD sesuai field `currency` dari STS); (c) instruksi pembayaran (Bank, No Rekening, Atas Nama, Kode Bayar, Batas Pembayaran dengan indikator sisa hari, warning bila ≤ 3 hari). Data read-only dari STS webhook APPROVED | Customer | Must Have |
+| FR-EI-12 | Customer harus dapat mengunduh dokumen EPB resmi (PDF) melalui tombol **"Download EPB PDF"** yang tersedia di semua status. File di-stream LPS dari `epb_pdf_url` STS via proxy endpoint; LPS tidak generate PDF mandiri | Customer | Must Have |
 
 ## Cross-Cutting Requirements
 

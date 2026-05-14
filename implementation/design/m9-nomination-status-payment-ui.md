@@ -1,6 +1,8 @@
 # M9 — Nomination Status & EPB Confirmation · UI Design
 
-**Last updated:** 2026-05-13 (sync status labels v3.3) · **Surface:** A (Customer Portal) · **Status:** ACTIVE
+**Last updated:** 2026-05-14 (v3.4 EPB invoice-style preview) · **Surface:** A (Customer Portal) · **Status:** ACTIVE
+
+> **v3.4 notes:** EPB Detail section di halaman M9 diupgrade dari ringkasan minimal (Nomor EPB / Total / Due Date) ke **preview invoice-style** (compact variant Invoice Detail Card dari design system §3.2 v1.3 — Block 1 Vessel Ops + Block 2 Line Items table, **tanpa** Block 3 Payment Instruction). Tombol "Download EPB PDF" + "Bayar EPB" di luar card. Tambah FR-NP-09.
 
 > **v3.3 sync notes:** Status labels diupdate sesuai BRD v3.3 (production sync): "UNPAID" → "Belum Dibayar", "Menunggu Verifikasi Pembayaran" → "Menunggu Verifikasi", "Pembayaran Dikonfirmasi" → "Lunas". Route ke M9b berubah dari `/customer/epb-invoice/:id` → `/customer/billing/epb/:id`.
 
@@ -108,22 +110,43 @@ Hanya tampil saat ada aksi yang bisa diambil customer:
 - **Status Approved:** button primary "Bayar EPB" full-width → navigate ke `/customer/billing/epb/:epbPaymentId` (M9b).
 - **Status lain:** Card tidak tampil ATAU tampilkan info-only message.
 
-### 3.4 EPB Detail Section
+### 3.4 EPB Detail Section (v3.4 — invoice-style preview)
 
 Tampil saat `status >= APPROVED` dan `nomination.epb_number` ada.
 
+Pakai **Invoice Detail Card (compact variant)** dari design system §3.2 v1.3. Compact variant = Block 1 (Vessel Ops Grid) + Block 2 (Line Items Table dengan Subtotal/PPn/Total). **Block 3 (Payment Instruction Box) tidak ditampilkan di M9** — instruksi pembayaran lengkap dilihat customer di M9b setelah klik "Bayar EPB".
+
 ```
-EPB Detail
-─────────────────────────────────────────
-Nomor EPB           EPB-20260505-00001
-Total Tagihan       Rp 1.250.000.000
-Jatuh Tempo         15 Mei 2026
-Status Pembayaran   [Belum Dibayar]  atau  [Menunggu Verifikasi]  atau  [Lunas]  dst
-                    
-[          Bayar EPB →          ]   ← primary, full-width
+┌── Section header ──────────────────────────────────────┐
+│  Detail EPB                                            │
+│  EPB-20260430-00008    [Belum Dibayar]                 │
+│                       [↓ Download EPB PDF]             │
+├────────────────────────────────────────────────────────┤
+│                                                        │
+│ Vessel       MV Pacific Star    Crane       Crane 2    │
+│ STS Slot     STS-202603-001     Mooring     Team Alpha │
+│ ETA          12 Mar 2026 14:00  Surveyor    PT Sucof…  │
+│ Anchor       Anchor 3           Duration    24 jam     │
+│                                                        │
+├────────────────────────────────────────────────────────┤
+│ Item Layanan       Volume     Rate       Jumlah        │
+│ STS Fee            50,000 MT  $2.50/ton  $125,000      │
+│ Biaya Jasa Tamb.       —          —          —         │
+│                              Subtotal    $125,000      │
+│                              PPn (11%)   $13,750       │
+│                              Total       $138,750      │
+└────────────────────────────────────────────────────────┘
+
+  Jatuh Tempo: 5 Mar 2026 (3 hari) — text-rose-700 saat ≤ 3 hari
+
+[      Bayar EPB →      ]   ← primary, full-width (di Action Card kanan)
 ```
 
-Button "Bayar EPB" disabled jika payment status sudah PAID. Tooltip: "Pembayaran sudah selesai."
+**Tombol Action di M9:**
+- **Download EPB PDF** (outline, di header card kanan) — tersedia di semua status. Klik → `GET /api/customer/epb-payments/:epbPaymentId/document` (proxy ke STS).
+- **Bayar EPB** (primary, di Action Card right column) — tampil saat `epb_payment.status = UNPAID`; disabled + tooltip saat status sudah lanjut. Klik → navigate ke `/customer/billing/epb/:epbPaymentId` (M9b detail).
+
+**Fallback minimal (data legacy):** sama dengan M9b — Block 1 disembunyikan jika `vessel_ops` null, Block 2 collapse ke single row "Total Tagihan EPB" jika `line_items` kosong.
 
 ---
 
@@ -134,9 +157,11 @@ Button "Bayar EPB" disabled jika payment status sudah PAID. Tooltip: "Pembayaran
 | Section Card | Setiap section di kedua kolom |
 | Status Badge | Header page, EPB status |
 | Status Banner | Top of left column, varian per status |
+| **Invoice Detail Card (compact)** (§3.2 v1.3) | EPB Detail section — Block 1 + Block 2 (tanpa Payment Instruction) |
 | Timeline (custom) | Right column |
 | Action Card | Right column kontextual |
 | Document list item | Section Dokumen Pendukung |
+| Button outline + Download icon | Tombol "Download EPB PDF" di header EPB Detail |
 | Empty state | Additional Service kosong |
 | Button primary | Bayar EPB, Edit Nominasi |
 

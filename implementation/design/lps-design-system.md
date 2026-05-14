@@ -1,6 +1,6 @@
 # LPS Platform — Design System
 
-**Version:** 1.2 · **Last updated:** 2026-05-13 · **Status:** ACTIVE — single source of truth untuk semua UI work di LPS Platform.
+**Version:** 1.3 · **Last updated:** 2026-05-14 · **Status:** ACTIVE — single source of truth untuk semua UI work di LPS Platform.
 
 > **Cara pakai:** Setiap kerja UI (baru, edit, refactor) **wajib** baca dokumen ini dulu, lalu invoke skill `ui-ux-pro-max` untuk validasi/generate komponen. Per-modul design doc (`m<N>-<name>-ui.md`) menjabarkan penerapan untuk modul masing-masing dan tetap merujuk ke dokumen ini.
 
@@ -513,6 +513,136 @@ Accent variant (warning/error/primary metric): tambah `border-l-4 border-l-{colo
 </div>
 ```
 
+#### Invoice Detail Card (Surface A, v1.3)
+
+Pattern detail tagihan yang menyerupai invoice fisik. Dipakai di Detail EPB (M9b), preview EPB di M9, dan dapat direuse untuk Invoice (M9c) saat detail butuh dirinci.
+
+Struktur tiga blok berurutan (header status banner di luar card):
+1. **Vessel Ops Grid** — info operasional voyage (2 kolom × N baris).
+2. **Line Items Table** — Item Layanan / Volume / Rate / Jumlah + Subtotal / PPn / Total.
+3. **Payment Instruction Box** — bank info + kode bayar + batas pembayaran dengan countdown.
+
+```jsx
+<section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+  {/* Block 1 — Vessel Ops Grid */}
+  <div className="p-6 sm:p-8 border-b border-slate-100">
+    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-4 text-sm">
+      <div className="flex items-center justify-between">
+        <dt className="text-slate-500">Vessel</dt>
+        <dd className="font-semibold text-slate-900">MV Pacific Star</dd>
+      </div>
+      <div className="flex items-center justify-between">
+        <dt className="text-slate-500">Crane</dt>
+        <dd className="font-semibold text-slate-900">Crane 2</dd>
+      </div>
+      {/* … STS Slot, Mooring Team, ETA, Surveyor, Anchor, Est. Duration */}
+    </dl>
+  </div>
+
+  {/* Block 2 — Line Items Table */}
+  <div className="p-6 sm:p-8 border-b border-slate-100">
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="text-slate-500 border-b border-slate-200">
+          <th className="text-left font-medium py-3">Item Layanan</th>
+          <th className="text-right font-medium py-3">Volume</th>
+          <th className="text-right font-medium py-3">Rate</th>
+          <th className="text-right font-medium py-3">Jumlah</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr className="border-b border-slate-100">
+          <td className="py-3.5 text-slate-900">STS Fee</td>
+          <td className="py-3.5 text-right tabular-nums text-slate-700">50,000 MT</td>
+          <td className="py-3.5 text-right tabular-nums text-slate-700">$2.50/ton</td>
+          <td className="py-3.5 text-right tabular-nums font-semibold text-slate-900">$125,000</td>
+        </tr>
+        <tr className="border-b border-slate-100">
+          <td className="py-3.5 text-slate-900">Biaya Jasa Tambahan</td>
+          <td className="py-3.5 text-right text-slate-400">—</td>
+          <td className="py-3.5 text-right text-slate-400">—</td>
+          <td className="py-3.5 text-right text-slate-400">—</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colSpan={3} className="text-right py-2 text-slate-500">Subtotal</td>
+          <td className="text-right py-2 tabular-nums font-semibold text-slate-900">$125,000</td>
+        </tr>
+        <tr>
+          <td colSpan={3} className="text-right py-2 text-slate-500">PPn (11%)</td>
+          <td className="text-right py-2 tabular-nums font-semibold text-slate-900">$13,750</td>
+        </tr>
+        <tr className="bg-slate-50/60">
+          <td colSpan={3} className="text-right py-3.5 text-slate-700 font-semibold">Total</td>
+          <td className="text-right py-3.5 tabular-nums text-lg font-bold text-[#0F2A4D]">$138,750</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  {/* Block 3 — Payment Instruction Box */}
+  <div className="m-6 sm:m-8 rounded-xl border border-amber-200 bg-amber-50/50 p-5 sm:p-6">
+    <div className="text-sm font-semibold text-amber-900 mb-4">Instruksi Pembayaran</div>
+    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-3 text-sm">
+      <div>
+        <dt className="text-xs text-amber-800/70">Bank</dt>
+        <dd className="font-semibold text-slate-900 mt-0.5">BNI</dd>
+      </div>
+      <div>
+        <dt className="text-xs text-amber-800/70">Kode Bayar</dt>
+        <dd className="font-semibold text-slate-900 mt-0.5 font-mono">TBK-202603-001</dd>
+      </div>
+      <div>
+        <dt className="text-xs text-amber-800/70">No Rekening</dt>
+        <dd className="font-semibold text-slate-900 mt-0.5 font-mono">1234567890</dd>
+      </div>
+      <div>
+        <dt className="text-xs text-amber-800/70">Batas Pembayaran</dt>
+        <dd className="font-semibold text-rose-700 mt-0.5">5 Mar 2026 <span className="text-rose-600">(3 hari)</span></dd>
+      </div>
+      <div>
+        <dt className="text-xs text-amber-800/70">Atas Nama</dt>
+        <dd className="font-semibold text-slate-900 mt-0.5">PT Tata Bumi Khatulistiwa</dd>
+      </div>
+      <div>
+        <dt className="text-xs text-amber-800/70">Total</dt>
+        <dd className="font-bold text-[#0F2A4D] mt-0.5 tabular-nums">$138,750</dd>
+      </div>
+    </dl>
+  </div>
+
+  {/* Footer actions (slot) */}
+  <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 px-6 sm:px-8 pb-6 sm:pb-8">
+    <button className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium hover:bg-slate-50">
+      <Download className="h-4 w-4" /> Download EPB PDF
+    </button>
+    <button className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#0F2A4D] text-white px-4 py-2.5 text-sm font-medium hover:bg-[#0F2A4D]/90">
+      <CheckCircle2 className="h-4 w-4" /> Konfirmasi Pembayaran
+    </button>
+  </div>
+</section>
+```
+
+**Aturan pakai:**
+- Currency formatter: gunakan `Intl.NumberFormat(locale, { style: 'currency', currency })` di runtime. `currency` field dari payload menentukan render (IDR → "Rp 138.750.000", USD → "$138,750"). Angka di `tabular-nums` agar kolom rapi.
+- Volume & Rate adalah string display dari STS (bukan dihitung di LPS) — jangan reformat.
+- **Compact variant (untuk preview di M9):** sembunyikan block 3 (Payment Instruction Box) dan footer actions; tetap tampilkan block 1 + block 2. Tombol "Bayar EPB" + "Download EPB PDF" dipindah ke action card kontextual di luar.
+- **Fallback minimal (data legacy):** jika `line_items` kosong dan `vessel_ops` null, render fallback ke pattern "Detail Tagihan" lama (Nomor EPB / Total / Currency / Due Date) — tidak boleh kosong/broken.
+
+#### Payment Instruction Box (standalone, v1.3)
+
+Sub-component dari Invoice Detail Card. Bisa juga dipakai standalone (misal di info card sederhana). Pattern fixed amber tone untuk "ada aksi pembayaran yang harus dilakukan". Lihat block 3 di atas. Wajib include 5 field minimum: Bank, No Rekening, Atas Nama, Kode Bayar, Batas Pembayaran. Field `Kode Bayar` dan `No Rekening` pakai `font-mono` agar mudah disalin.
+
+**Countdown indicator (`Batas Pembayaran`):**
+- ≤ 3 hari atau overdue: `text-rose-700` + (X hari) atau "Lewat X hari".
+- 4–7 hari: `text-amber-800`.
+- > 7 hari: `text-slate-900` (no emphasis).
+
+#### Line Items Table (standalone, v1.3)
+
+Sub-component dari Invoice Detail Card. Pattern: header row muted, body row dengan border-bottom slate-100, tfoot rows dengan label di kanan dan amount `tabular-nums`. Baris **Total** pakai bg-slate-50/60, font-bold, color `#0F2A4D`, size `text-lg`. Lihat block 2 di Invoice Detail Card.
+
 #### Status Banner (di detail page)
 
 ```jsx
@@ -919,4 +1049,5 @@ Sebelum klaim selesai untuk pekerjaan UI:
 |---|---|---|
 | 2026-05-13 | 1.0 | Initial release — foundation, dua surface preset, component library, mapping status LPS. Dibuat dari analisis screenshot production (Customer Portal + LPS System Bunati Port). |
 | 2026-05-13 | 1.1 | Tambah pattern auth split-screen layout (customer login/register), Input with leading icon + eye toggle, Divider with text, Image Showcase Carousel dengan 3 default slides Surface A, Auth Centered layout (admin login), brand mark wordmark variant (anchor + "LPS System"), canonical naming. Dipicu oleh screenshot login customer baru. |
+| 2026-05-14 | 1.3 | **Invoice-style Detail Card** baru di §3.2: tiga blok (Vessel Ops Grid + Line Items Table + Payment Instruction Box) untuk Detail EPB invoice-like. Sub-komponen baru: **Line Items Table** (standalone, table dengan tfoot Subtotal/PPn/Total dan baris Total emphasized) dan **Payment Instruction Box** (amber tone, font-mono untuk Kode Bayar & No Rek, countdown indicator pada Batas Pembayaran). Currency support multi-currency (IDR/USD) via `Intl.NumberFormat`. Compact variant untuk preview di M9 (Block 1+2 only, no payment instruction). Dipicu oleh permintaan improve UI Detail Tagihan menyerupai invoice fisik. |
 | 2026-05-13 | 1.2 | **Status label sync dengan production:** UNPAID→"Belum Dibayar", Pembayaran Dikonfirmasi→"Lunas", Menunggu Verifikasi Pembayaran→"Menunggu Verifikasi" (lebih ringkas). Tambah kategori filter "Perlu Tindakan" (UNPAID+PAYMENT_REJECT+Overdue) sebagai meta-status untuk KPI pill & tab. Tambah komponen baru: KPI Filter Pill (3 default kategori billing), Overdue Date Display (deteksi due_date < now), Inline Info Banner (varian per status untuk list items). Tambah Overdue indicator palette token. Dipicu oleh pemisahan M9b/M9c dan screenshot production EPB & Invoice. |

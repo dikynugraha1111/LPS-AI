@@ -1,6 +1,8 @@
 # Replit Handoff — M9: Nomination Status & EPB Confirmation
 
-**Version:** 2.1 (sync v3.3 — status labels & billing routes)
+**Version:** 2.2 (v3.4 — EPB invoice-style preview + extended schema)
+
+> **v2.2 changes (2026-05-14):** Tabel `nomination_epb` diperluas dengan kolom invoice-style (vessel ops, kalkulasi subtotal/ppn, bank info, kode bayar, pdf_url) + tabel baru `nomination_epb_line_items`. Webhook APPROVED payload menerima field tambahan dari STS. M9 detail page menampilkan **preview Invoice Detail Card (compact)** + tombol "Download EPB PDF". Tambah FR-NP-09.
 
 > **v2.1 changes (2026-05-13):** Status labels disinkronkan ke BRD v3.3 mapping (UNPAID→Belum Dibayar, Pembayaran Dikonfirmasi→Lunas, Menunggu Verifikasi Pembayaran→Menunggu Verifikasi). Route ke M9b berubah dari `/customer/epb-invoice` → `/customer/billing/epb`. Saat insert row `epb_payments` di event APPROVED, sekarang juga set `total_amount`, `currency`, `due_date` (kolom baru di v3.3 — lihat M9b handoff v2.0).
 
@@ -53,15 +55,54 @@ ALTER TABLE nominations
     ADD COLUMN sts_nomination_id        VARCHAR(100);
 
 -- EPB data received from STS Platform (read-only display)
+-- v2.2: extended dengan field invoice-style (vessel ops, kalkulasi, bank info, pdf_url)
 CREATE TABLE nomination_epb (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    nomination_id UUID NOT NULL REFERENCES nominations(id) ON DELETE CASCADE,
-    epb_number    VARCHAR(50) NOT NULL UNIQUE,
-    amount        DECIMAL(20,2) NOT NULL,
-    currency      VARCHAR(10) NOT NULL DEFAULT 'IDR',
-    due_date      TIMESTAMPTZ,
-    received_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nomination_id       UUID NOT NULL REFERENCES nominations(id) ON DELETE CASCADE,
+    epb_number          VARCHAR(50) NOT NULL UNIQUE,
+    -- Kalkulasi
+    subtotal            NUMERIC(20,2),
+    vat_rate            NUMERIC(5,4) DEFAULT 0.11,
+    vat_amount          NUMERIC(20,2),
+    total_amount        NUMERIC(20,2) NOT NULL,   -- = subtotal + vat_amount; fallback legacy 'amount'
+    currency            VARCHAR(10) NOT NULL DEFAULT 'IDR',  -- 'IDR' | 'USD'
+    due_date            TIMESTAMPTZ,
+    -- Operasional voyage
+    vessel_name         VARCHAR(255),
+    crane               VARCHAR(50),
+    sts_slot            VARCHAR(50),
+    mooring_team        VARCHAR(100),
+    eta                 TIMESTAMPTZ,
+    surveyor            VARCHAR(255),
+    anchor              VARCHAR(50),
+    est_duration_hours  INTEGER,
+    -- Bank instruction
+    bank_name           VARCHAR(100),
+    bank_account_no     VARCHAR(50),
+    bank_account_holder VARCHAR(255),
+    kode_bayar          VARCHAR(100),
+    -- Dokumen
+    epb_pdf_url         TEXT,
+    -- Audit
+    received_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Line items per EPB (v2.2)
+CREATE TABLE nomination_epb_line_items (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    epb_id      UUID NOT NULL REFERENCES nomination_epb(id) ON DELETE CASCADE,
+    label       VARCHAR(255) NOT NULL,
+    volume      VARCHAR(50),
+    rate        VARCHAR(50),
+    amount      NUMERIC(20,2) NOT NULL,
+    sort_order  INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX idx_epb_line_items_epb_id ON nomination_epb_line_items(epb_id);
+
+-- ⚠️ Migrasi delta untuk DB yang sudah ada nomination_epb (v2.1):
+-- Pakai ALTER TABLE … ADD COLUMN IF NOT EXISTS untuk seluruh kolom baru di atas.
+-- Kolom `amount` lama dipertahankan sebagai alias (atau di-rename ke total_amount).
+-- Backfill: untuk row existing, total_amount := amount, vat_amount := NULL, subtotal := NULL.
 
 -- Immutable status change history (used by M9 and M9b)
 CREATE TABLE nomination_status_history (
@@ -138,30 +179,68 @@ type STSWebhookPayload struct {
 
 Route by `Event`:
 
-**Event: `APPROVED`**
+**Event: `APPROVED` (v2.2 — extended)**
 ```go
+type VesselOps struct {
+    VesselName       string    `json:"vessel_name"`
+    Crane            string    `json:"crane"`
+    STSSlot          string    `json:"sts_slot"`
+    MooringTeam      string    `json:"mooring_team"`
+    ETA              time.Time `json:"eta"`
+    Surveyor         string    `json:"surveyor"`
+    Anchor           string    `json:"anchor"`
+    EstDurationHours int       `json:"est_duration_hours"`
+}
+
+type LineItem struct {
+    Label  string  `json:"label"`
+    Volume *string `json:"volume"`
+    Rate   *string `json:"rate"`
+    Amount float64 `json:"amount"`
+}
+
+type BankInfo struct {
+    BankName      string `json:"bank_name"`
+    AccountNumber string `json:"account_number"`
+    AccountHolder string `json:"account_holder"`
+    KodeBayar     string `json:"kode_bayar"`
+}
+
 type ApprovedData struct {
     AnchorPoint            string    `json:"anchor_point"`
     ETB                    time.Time `json:"etb"`
     EstimatedDurationHours int       `json:"estimated_duration_hours"`
     EPB struct {
-        EPBNumber string    `json:"epb_number"`
-        Amount    float64   `json:"amount"`
-        Currency  string    `json:"currency"`
-        DueDate   time.Time `json:"due_date"`
+        EPBNumber   string     `json:"epb_number"`
+        // Kalkulasi
+        Subtotal    *float64   `json:"subtotal"`
+        VatRate     *float64   `json:"vat_rate"`
+        VatAmount   *float64   `json:"vat_amount"`
+        TotalAmount float64    `json:"total_amount"` // wajib
+        Amount      *float64   `json:"amount"`       // legacy fallback (alias of total_amount)
+        Currency    string     `json:"currency"`     // 'IDR' | 'USD'
+        DueDate     time.Time  `json:"due_date"`
+        // Invoice-style (v2.2)
+        VesselOps   *VesselOps `json:"vessel_ops"`
+        LineItems   []LineItem `json:"line_items"`
+        BankInfo    *BankInfo  `json:"bank_info"`
+        EPBPDFURL   *string    `json:"epb_pdf_url"`
     } `json:"epb"`
 }
 ```
 Actions:
 1. Update nomination: `status = APPROVED`, `anchor_point`, `etb`, `estimated_duration_hours`, `sts_nomination_id`.
-2. Insert into `nomination_epb`.
-3. **Otomatis buat row `epb_payments`** (defined in M9b schema) dengan status `UNPAID`, linked ke `nomination_epb.id` yang baru dibuat. Ini memunculkan EPB di menu M9b tanpa aksi customer.
+2. Insert into `nomination_epb` dengan **semua field extended** (`subtotal`, `vat_*`, `vessel_*`, `bank_*`, `kode_bayar`, `epb_pdf_url`). Jika field opsional null di payload, simpan NULL di kolom. Resolve `total_amount`: prefer `total_amount`, fallback ke `amount` legacy.
+3. Insert rows into `nomination_epb_line_items` (jika `line_items[]` ada).
+4. **Otomatis buat row `epb_payments`** (defined in M9b schema) dengan status `UNPAID`, linked ke `nomination_epb.id`. Set `total_amount`, `currency`, `due_date` dari EPB.
    ```sql
-   INSERT INTO epb_payments (id, nomination_id, epb_id, status)
-   VALUES (gen_random_uuid(), :nomination_id, :epb_id, 'UNPAID');
+   INSERT INTO epb_payments (id, nomination_id, epb_id, status, total_amount, currency, due_date)
+   VALUES (gen_random_uuid(), :nomination_id, :epb_id, 'UNPAID', :total, :currency, :due);
    ```
-4. Record status history (triggered_by: "sts_webhook").
-5. Send in-app + email notification to customer.
+5. Record status history (triggered_by: "sts_webhook").
+6. Send in-app + email notification to customer.
+
+> **Backwards compatibility:** Jika STS belum upgrade ke v3.4 payload (field `vessel_ops`/`line_items`/dsb tidak ada), insert tetap berhasil dengan kolom NULL. UI fallback minimal di M9b + M9 (lihat per-modul UI doc).
 
 **Event: `NEED_REVISION`**
 ```go
@@ -203,10 +282,24 @@ Response:
     "submitted_at": "2026-05-01T10:00:00Z"
   },
   "epb": {
-    "epb_number": "EPB-2026-0042",
-    "amount": 15000000.00,
-    "currency": "IDR",
-    "due_date": "2026-04-30T23:59:59Z"
+    "epb_number": "EPB-20260430-00008",
+    "epb_payment_id": "uuid",                       // dari epb_payments — utk navigate ke M9b
+    "payment_status": "UNPAID",                     // status payment terkini (mirror dari epb_payments)
+    "subtotal": 125000.00,
+    "vat_rate": 0.11,
+    "vat_amount": 13750.00,
+    "total_amount": 138750.00,
+    "currency": "USD",
+    "due_date": "2026-03-05T23:59:59Z",
+    "vessel_ops": {
+      "vessel_name": "MV Pacific Star", "crane": "Crane 2", "sts_slot": "STS-202603-001",
+      "mooring_team": "Team Alpha", "eta": "2026-03-12T14:00:00Z", "surveyor": "PT Sucofindo",
+      "anchor": "Anchor 3", "est_duration_hours": 24
+    } | null,
+    "line_items": [
+      { "label": "STS Fee", "volume": "50,000 MT", "rate": "$2.50/ton", "amount": 125000.00 }
+    ] | [],
+    "epb_pdf_url_available": true                   // boolean; URL aslinya tidak diekspose, hanya flag
   } | null,
   "status_history": [
     { "from_status": "SUBMITTED", "to_status": "PENDING", "triggered_by": "system", "created_at": "" }
@@ -270,10 +363,22 @@ Use TanStack React Query to fetch `/api/customer/nominations/:id/status`. Poll e
 
 *Nomination Details* — always visible: vessel name, ETA, cargo type, qty, charterer, barge count, documents list.
 
-*Schedule & EPB* — visible when status is `APPROVED` or `WAITING_PAYMENT_VERIFICATION`:
-- Anchor Point, ETB (formatted date-time), Estimated Duration
-- EPB Number, Amount (format as "Rp XX.XXX.XXX"), Due Date
-- Tombol **"Bayar EPB"** → link ke `/customer/billing/epb` (hanya tampil saat `APPROVED`)
+*Schedule & EPB Detail (v2.2 — invoice-style preview)* — visible when status is `APPROVED` or `WAITING_PAYMENT_VERIFICATION`:
+
+Render pakai **Invoice Detail Card (compact variant)** dari design system §3.2 v1.3. Compact = Block 1 (Vessel Ops Grid) + Block 2 (Line Items Table dengan Subtotal/PPn/Total). **Block 3 Payment Instruction NOT shown** — instruksi pembayaran lengkap dilihat di M9b.
+
+Card header:
+- Kiri: `EPB-{epb_number}` (mono bold) + `<StatusBadge>` untuk `payment_status`.
+- Kanan: tombol `<Button variant="outline"><Download /> Download EPB PDF</Button>` (FR-NP-09). Disabled jika `epb_pdf_url_available = false`. Klik → `window.open('/api/customer/epb-payments/'+epb.epb_payment_id+'/document', '_blank')`.
+
+Card body:
+- **Block 1 Vessel Ops:** render saat `epb.vessel_ops != null`. Field: Vessel, Crane, STS Slot, Mooring Team, ETA, Surveyor, Anchor, Est. Duration.
+- **Block 2 Line Items:** render saat `epb.line_items.length > 0`. Columns: Item Layanan / Volume / Rate / Jumlah. Tfoot: Subtotal, PPn (label dinamis dari `vat_rate`), Total (bold + navy + tabular-nums).
+- Currency formatter via helper `formatCurrency(amount, epb.currency)` — IDR pakai `id-ID`, USD pakai `en-US`.
+- **Fallback minimal** (data legacy `vessel_ops` null + `line_items` kosong): render single Section Card sederhana — Nomor EPB / Total Tagihan / Currency / Due Date.
+
+Action Card (right column kontextual) tetap:
+- Tombol **"Bayar EPB"** → link ke `/customer/billing/epb/:epb_payment_id` (hanya tampil saat `payment_status = UNPAID`)
 
 *Info Banner EPB* — visible when status is `WAITING_PAYMENT_VERIFICATION`:
 - Teal info box: "Bukti pembayaran sedang diverifikasi." + link ke EPB & Invoice
@@ -312,3 +417,15 @@ Pre-fill form with existing nomination data. Same form as M8 NominationFormPage 
 - [ ] Revision form is only accessible when status is `NEED_REVISION`
 - [ ] Re-submission sets status back to `PENDING`
 - [ ] All nomination status changes recorded in `nomination_status_history`
+
+### v2.2 additions (invoice-style EPB preview)
+- [ ] Migration `nomination_epb` punya kolom extended: `subtotal`, `vat_rate`, `vat_amount`, `total_amount`, `currency`, `vessel_name`, `crane`, `sts_slot`, `mooring_team`, `eta`, `surveyor`, `anchor`, `est_duration_hours`, `bank_name`, `bank_account_no`, `bank_account_holder`, `kode_bayar`, `epb_pdf_url`.
+- [ ] Migration tabel baru `nomination_epb_line_items` (epb_id, label, volume, rate, amount, sort_order).
+- [ ] Webhook APPROVED handler insert seluruh field extended ke `nomination_epb` (NULL untuk field opsional yang tidak hadir di payload).
+- [ ] Webhook APPROVED handler insert rows ke `nomination_epb_line_items` (jika ada).
+- [ ] Response `GET /api/customer/nominations/:id/status` include `epb.vessel_ops`, `epb.line_items`, `epb.subtotal`, `epb.vat_*`, `epb.epb_pdf_url_available`, `epb.epb_payment_id`, `epb.payment_status`.
+- [ ] Frontend EPB Detail section render Invoice Detail Card compact (Block 1 + Block 2) dari design system §3.2 v1.3.
+- [ ] Tombol "Download EPB PDF" tampil di header EPB card; disabled saat `epb_pdf_url_available = false`.
+- [ ] Tombol "Bayar EPB" navigate ke `/customer/billing/epb/:epb_payment_id` (specific EPB, bukan list).
+- [ ] Fallback minimal untuk legacy nomination tanpa data extended — tidak boleh broken/kosong.
+- [ ] Currency formatter konsisten dengan M9b (IDR id-ID, USD en-US).
