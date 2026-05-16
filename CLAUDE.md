@@ -89,6 +89,7 @@ Folder `document/brd/` berisi satu file per modul (M1–M12) yang dipecah dari B
 | `document/brd/m10-customer-dashboard.md` | M10 — Customer Dashboard & Monitoring |
 | `document/brd/m11-monitoring-dashboard.md` | M11 — Monitoring & Visibility Dashboard |
 | `document/brd/m12-system-configuration.md` | M12 — System Configuration |
+| `document/brd/m13-mother-vessel-master.md` | M13 — Mother Vessel Master (Customer Portal) |
 
 ---
 

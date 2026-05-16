@@ -1,6 +1,8 @@
 # M8 — Nomination Request Submission · UI Design
 
-**Last updated:** 2026-05-13 · **Surface:** A (Customer Portal) · **Status:** ACTIVE
+**Last updated:** 2026-05-16 (v1.1 — vessel selector terintegrasi M13) · **Surface:** A (Customer Portal) · **Status:** ACTIVE
+
+> **v1.1:** Vessel selector tidak lagi pakai `GET /api/sts/vessels` generik. Sekarang load MV milik customer ber-status `ACTIVE` dari `GET /api/customer/mother-vessels/active` (modul M13). Tambah empty state link ke menu Mother Vessel. Lihat §4 Komponen + §5 Edge Cases.
 
 > Wajib dibaca bersama `lps-design-system.md`.
 
@@ -40,8 +42,8 @@ Halaman list nominasi (`/customer/nominations`) ada di M10.
              |  ┌────────────────────────────────────────────────┐
              |  │ 1. Informasi Kapal                             │
              |  │ ──────────────────────────────────────────────  │
-             |  │ Nama Kapal *      [Cari kapal di STS... ▾]     │
-             |  │ IMO No (read-only setelah pilih kapal)         │
+             |  │ Mother Vessel *   [Pilih MV aktif Anda... ▾]  │
+             |  │ IMO No (read-only setelah pilih MV)            │
              |  │ Flag             [____________]                │
              |  │ DWT              [____________]                │
              |  │ LOA              [____________]                │
@@ -99,7 +101,7 @@ Halaman list nominasi (`/customer/nominations`) ada di M10.
 **Komponen:**
 
 - **Each section:** Section Card (lihat design system §3.2).
-- **Vessel selector:** Combobox shadcn pakai async search ke STS API (`GET /api/sts/vessels?search=`). Pilihan tampilkan: nama kapal + IMO + flag. Setelah pilih, field IMO/Flag/DWT/LOA auto-fill read-only.
+- **Vessel selector (v1.1 — terintegrasi M13):** Combobox shadcn yang load **MV milik customer ber-status `ACTIVE`** dari `GET /api/customer/mother-vessels/active` (bukan lagi `GET /api/sts/vessels` generik). Pilihan tampilkan: nama kapal + asset code + IMO. Setelah pilih, simpan `mv_asset_id`; field IMO/DWT auto-fill read-only dari snapshot pilihan. MV `PENDING_APPROVAL`/`INACTIVE`/`REJECTED` tidak muncul (server-side filter). **Empty state** (customer belum punya MV ACTIVE): combobox menampilkan pesan "Belum ada Mother Vessel aktif." + link aksi "Daftarkan MV di menu Mother Vessel →" yang navigate ke `/customer/mother-vessel` (M13). Customer harus punya minimal 1 MV ACTIVE sebelum bisa submit nominasi.
 - **Date-time picker:** shadcn `<Calendar>` + time input. Format: `DD/MM/YYYY HH:MM` (WIB).
 - **Anchor Point selector:** shadcn `<Select>`, options dari STS API.
 - **Jenis Kegiatan:** Radio group horizontal, 2 opsi.
@@ -144,7 +146,9 @@ Halaman list nominasi (`/customer/nominations`) ada di M10.
 
 | Trigger | UI behavior |
 |---|---|
-| STS API down (vessel/anchor list) | Combobox/select tampilkan empty + helper text "Gagal memuat data dari STS. Coba lagi." + retry button. |
+| MV list gagal dimuat (STS down via M13 proxy) | Vessel combobox tampilkan empty + helper text "Gagal memuat daftar Mother Vessel. Coba lagi." + retry button. |
+| Customer belum punya MV `ACTIVE` | Vessel combobox tampilkan empty state: "Belum ada Mother Vessel aktif." + link "Daftarkan MV di menu Mother Vessel →" (`/customer/mother-vessel`). Submit di-block sampai ada MV ACTIVE terpilih. |
+| Anchor list STS down | Select anchor tampilkan empty + helper "Gagal memuat data dari STS. Coba lagi." + retry. |
 | File upload > 10 MB | Toast error per file. File tidak ditambahkan. |
 | Submit gagal di STS Platform | Toast error dengan kode error STS + tombol "Coba Lagi". Nominasi tetap sebagai Draft. |
 | Draft auto-save (optional fase 2) | Indicator subtle di kanan "Draft tersimpan otomatis · 14:32" muted text. |

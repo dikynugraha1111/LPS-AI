@@ -1,6 +1,6 @@
 # LPS Platform — Design System
 
-**Version:** 1.3 · **Last updated:** 2026-05-14 · **Status:** ACTIVE — single source of truth untuk semua UI work di LPS Platform.
+**Version:** 1.4 · **Last updated:** 2026-05-15 · **Status:** ACTIVE — single source of truth untuk semua UI work di LPS Platform.
 
 > **Cara pakai:** Setiap kerja UI (baru, edit, refactor) **wajib** baca dokumen ini dulu, lalu invoke skill `ui-ux-pro-max` untuk validasi/generate komponen. Per-modul design doc (`m<N>-<name>-ui.md`) menjabarkan penerapan untuk modul masing-masing dan tetap merujuk ke dokumen ini.
 
@@ -84,6 +84,10 @@ Setiap status pakai tiga shade: `50` (background), `200` (border), `700` (text).
 | `ACTIVE` (vessel) | Aktif | ACTIVE | Success |
 | `LOADING` (vessel) | Loading | LOADING | Info |
 | `URGENT` (alert) | Mendesak | URGENT | Error |
+| `ACTIVE` (master data / MV) | Active | Active | Confirmed |
+| `INACTIVE` (master data / MV) | Inactive | Inactive | Neutral |
+| `PENDING_APPROVAL` (approval request) | Pending Approval | Pending Approval | Pending verify |
+| `REJECTED` (approval request) | Rejected | Rejected | Error |
 
 ### 2.2 Typography
 
@@ -696,6 +700,232 @@ Sub-component dari Invoice Detail Card. Pattern: header row muted, body row deng
 
 Untuk empty state yang lebih impactful (halaman kosong): tambah icon `h-12 w-12 text-slate-300 mx-auto mb-4` + CTA button di bawah copy.
 
+#### Modal Dialog (form / detail) — v1.4
+
+Pattern modal terpusat untuk form (Add/Edit) atau detail view. Basis shadcn/ui `Dialog`. Dipakai di master-data CRUD (M13) dan form modal lain.
+
+```jsx
+{/* Overlay */}
+<div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-[1px]" />
+
+{/* Dialog panel — centered, scrollable body */}
+<div className="fixed left-1/2 top-1/2 z-50 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2
+                rounded-2xl border border-slate-200 bg-white shadow-md
+                max-h-[90vh] flex flex-col">
+  {/* Header (sticky) */}
+  <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+    <div>
+      <h2 className="text-lg font-semibold text-slate-900">Add New MV</h2>
+      <p className="text-sm text-slate-500 mt-1">Lengkapi detail di bawah. Aksi ini membuat permintaan persetujuan.</p>
+    </div>
+    <button aria-label="Tutup" className="h-9 w-9 rounded-lg hover:bg-slate-100 inline-flex items-center justify-center">
+      <X className="h-4 w-4 text-slate-500" />
+    </button>
+  </header>
+
+  {/* Body — scrollable */}
+  <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+    {/* form / detail content */}
+  </div>
+
+  {/* Footer (sticky) — actions kanan */}
+  <footer className="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
+    <button className="bg-white border border-slate-300 text-slate-900 hover:bg-slate-50 rounded-lg px-4 py-2.5 font-medium">Batal</button>
+    <button className="bg-[#0F2A4D] text-white hover:bg-[#0B1F3A] rounded-lg px-4 py-2.5 font-medium">Submit for Approval</button>
+  </footer>
+</div>
+```
+
+**Aturan:**
+- Width: `max-w-md` (confirm kecil), `max-w-2xl` (form sedang ~2 kolom), `max-w-3xl` (form besar / detail).
+- Body scroll internal (`overflow-y-auto`), header & footer sticky (tidak ikut scroll). Modal tidak boleh > `90vh`.
+- Overlay `bg-slate-900/50` (memenuhi standar scrim 40–60%). Klik overlay = close (kecuali form dengan unsaved changes → konfirmasi).
+- Esc close. Focus trap aktif; focus pindah ke field pertama (form) atau heading (detail) saat open. Saat close, focus balik ke trigger.
+- Motion: `initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.15 }}` (§2.8 Modal enter).
+- Hanya **satu primary** button di footer (kanan), secondary di kiri-nya (outlined).
+
+#### Confirmation Dialog (destructive / state change) — v1.4
+
+Varian Modal Dialog ukuran kecil untuk konfirmasi aksi berisiko (Deactivate, Hapus draft, dll).
+
+```jsx
+<div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2
+                rounded-2xl border border-slate-200 bg-white shadow-md p-6">
+  <div className="flex items-start gap-4">
+    <div className="h-10 w-10 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0">
+      <AlertTriangle className="h-5 w-5 text-amber-600" />
+    </div>
+    <div className="flex-1">
+      <h2 className="text-base font-semibold text-slate-900">Nonaktifkan MV Pacific Glory?</h2>
+      <p className="text-sm text-slate-600 mt-1.5">
+        Status akan diubah menjadi <strong>Inactive</strong> setelah disetujui admin STS. MV tidak akan
+        muncul di pilihan nominasi.
+      </p>
+    </div>
+  </div>
+  <footer className="flex items-center justify-end gap-3 mt-6">
+    <button className="bg-white border border-slate-300 text-slate-900 hover:bg-slate-50 rounded-lg px-4 py-2.5 font-medium">Batal</button>
+    <button className="bg-[#0F2A4D] text-white hover:bg-[#0B1F3A] rounded-lg px-4 py-2.5 font-medium">Submit for Approval</button>
+  </footer>
+</div>
+```
+
+**Aturan:**
+- Icon bulat kiri: `bg-amber-50 + AlertTriangle text-amber-600` untuk **state change non-destruktif yang butuh approval** (Deactivate via approval). Untuk **delete permanen / destruktif sungguhan** pakai `bg-rose-50 + Trash2 text-rose-600` dan button konfirmasi `Destructive` (rose).
+- Copy harus sebut konsekuensi konkret ("Status akan diubah menjadi Inactive", "tidak muncul di pilihan nominasi") — bukan generik "Apakah Anda yakin?".
+- Tombol konfirmasi label aksi spesifik ("Submit for Approval", "Hapus Permanen"), bukan "OK"/"Ya".
+- Default focus ke tombol **Batal** (mencegah konfirmasi tak sengaja via Enter).
+
+#### Form Field Grid — v1.4
+
+Pattern grid form 2-kolom untuk modal form dengan banyak field (master-data). Mendukung field disabled (auto-generated/auto-set) dan inline validation.
+
+```jsx
+<form className="space-y-6">
+  {/* Disclaimer banner — selalu di atas form yang membuat approval request */}
+  <div className="rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 flex items-start gap-2.5">
+    <AlertTriangle className="h-4 w-4 text-yellow-700 mt-0.5 flex-shrink-0" />
+    <p className="text-sm text-yellow-800">
+      Semua perubahan dikirim sebagai permintaan persetujuan dan memerlukan review admin sebelum diterapkan.
+    </p>
+  </div>
+
+  {/* 2-column grid */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
+    {/* Field normal + required */}
+    <div className="space-y-1.5">
+      <label htmlFor="vesselName" className="text-sm font-medium text-slate-700">
+        Vessel Name <span className="text-rose-600">*</span>
+      </label>
+      <input id="vesselName" className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm
+        text-slate-900 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0F2A4D]" />
+      {/* error state (muncul on blur) */}
+      {/* <p className="text-rose-600 text-xs mt-1">Vessel Name wajib diisi.</p> */}
+    </div>
+
+    {/* Field disabled — auto-generated */}
+    <div className="space-y-1.5">
+      <label htmlFor="assetCode" className="text-sm font-medium text-slate-700">Asset Code</label>
+      <input id="assetCode" disabled placeholder="MV-XXXX"
+        className="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2.5 text-sm
+        text-slate-500 cursor-not-allowed" />
+      <p className="text-xs text-slate-400">Dibuat otomatis saat disimpan.</p>
+    </div>
+
+    {/* Field full-width (span 2): contoh untuk catatan panjang */}
+    <div className="space-y-1.5 sm:col-span-2">
+      {/* ... */}
+    </div>
+  </div>
+</form>
+```
+
+**Aturan:**
+- Grid `grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4`. Field panjang/penuh boleh `sm:col-span-2`.
+- **Required indicator:** asterisk `<span className="text-rose-600">*</span>` setelah label. Optional field tanpa asterisk (tidak pakai teks "(opsional)" agar ringkas, kecuali butuh disambiguasi).
+- **Label wajib `<label htmlFor>`** — tidak boleh placeholder-only (a11y).
+- **Disabled vs read-only:** field auto-generated/auto-set pakai `disabled` + `bg-slate-100 text-slate-500 cursor-not-allowed` + helper text menjelaskan kenapa ("Dibuat otomatis saat disimpan.", "Otomatis diisi sesuai organisasi Anda."). Bedakan jelas dari field aktif.
+- **Inline validation:** validasi **on blur** (bukan on keystroke, bukan submit-only). Error tampil di bawah field: `text-rose-600 text-xs mt-1` + border field jadi `border-rose-300`. Setelah submit gagal, auto-focus field invalid pertama.
+- **Field grouping:** untuk form >8 field, kelompokkan secara visual dengan subheading (`text-xs uppercase tracking-wider text-slate-400 font-medium sm:col-span-2 pt-2`) per grup logis (mis. "Identitas", "Dimensi & Kapasitas").
+- **Submit feedback:** tombol submit `disabled` + spinner saat loading; sukses → toast + close modal; error → toast + tetap buka, preserve input.
+
+#### Audit Timeline (Riwayat Perubahan) — v1.4
+
+Pattern vertical timeline untuk menampilkan riwayat approval request / audit log per entity.
+
+```jsx
+<ol className="relative space-y-6">
+  {history.map((item, i) => (
+    <li key={item.id} className="relative pl-8">
+      {/* Connector line (kecuali item terakhir) */}
+      {i !== history.length - 1 && (
+        <span className="absolute left-[11px] top-6 bottom-[-24px] w-px bg-slate-200" aria-hidden />
+      )}
+      {/* Dot status */}
+      <span className={`absolute left-0 top-1 h-[22px] w-[22px] rounded-full border-2 flex items-center justify-center
+        ${item.status === 'APPROVED' ? 'border-emerald-200 bg-emerald-50'
+        : item.status === 'REJECTED' ? 'border-rose-200 bg-rose-50'
+        : 'border-teal-200 bg-teal-50'}`}>
+        {item.status === 'APPROVED' ? <Check className="h-3 w-3 text-emerald-600" />
+        : item.status === 'REJECTED' ? <X className="h-3 w-3 text-rose-600" />
+        : <Clock className="h-3 w-3 text-teal-600" />}
+      </span>
+
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-medium text-slate-900">
+            {item.actionLabel} {/* "Pengajuan MV Baru" / "Perubahan Data" / "Nonaktifkan" */}
+          </div>
+          <div className="text-xs text-slate-500 mt-0.5">
+            oleh {item.submitterName} · {item.submittedAt}
+          </div>
+        </div>
+        <StatusBadge variant={mapVariant(item.status)}>{item.statusLabel}</StatusBadge>
+      </div>
+
+      {/* Resolution detail */}
+      {item.status !== 'PENDING_APPROVAL' && (
+        <div className="text-xs text-slate-500 mt-1.5">
+          {item.status === 'APPROVED' ? 'Disetujui' : 'Ditolak'} oleh {item.reviewerName} · {item.resolvedAt}
+        </div>
+      )}
+      {/* Rejection reason — emphasized */}
+      {item.status === 'REJECTED' && item.rejectionReason && (
+        <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50/60 px-3 py-2 text-sm text-rose-700">
+          Alasan: {item.rejectionReason}
+        </div>
+      )}
+    </li>
+  ))}
+</ol>
+```
+
+**Aturan:**
+- Urutan **descending** (terbaru di atas).
+- Dot status: Approved emerald + `Check`, Rejected rose + `X`, Pending teal + `Clock`. Warna ambil dari Status palette §2.1.
+- Connector line `w-px bg-slate-200` antar item; item terakhir tanpa connector.
+- Rejection reason wajib ditonjolkan dalam box rose (`bg-rose-50/60`) — bukan teks biasa, karena ini info paling actionable bagi user.
+- Empty state: "Belum ada riwayat perubahan." (jarang; entry pertama selalu ada saat record dibuat).
+
+#### Disclaimer Banner — v1.4
+
+Banner peringatan ringan (non-error) untuk set ekspektasi sebelum aksi. Berbeda dari Inline Info Banner (yang per-status di list item) — ini untuk form/page context.
+
+```jsx
+<div className="rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3 flex items-start gap-2.5">
+  <AlertTriangle className="h-4 w-4 text-yellow-700 mt-0.5 flex-shrink-0" />
+  <p className="text-sm text-yellow-800">{message}</p>
+</div>
+```
+
+Pakai variant **Severity Warning** palette (§2.1). Untuk konteks informatif netral (bukan peringatan) pakai border/ bg `blue-200/blue-50` + icon `Info text-blue-600`.
+
+#### Locked Row Action (pending approval) — v1.4
+
+Affordance untuk icon aksi yang dikunci sementara (mis. Edit/Deactivate saat record `PENDING_APPROVAL`).
+
+```jsx
+{/* Enabled icon action */}
+<button className="h-9 w-9 rounded-lg hover:bg-slate-100 inline-flex items-center justify-center"
+        aria-label="Edit MV">
+  <Pencil className="h-4 w-4 text-slate-500" />
+</button>
+
+{/* Locked icon action — disabled + tooltip */}
+<Tooltip content="Edit tidak tersedia — sedang menunggu approval admin.">
+  <button disabled aria-label="Edit terkunci (menunggu approval)"
+    className="h-9 w-9 rounded-lg inline-flex items-center justify-center opacity-40 cursor-not-allowed">
+    <Pencil className="h-4 w-4 text-slate-400" />
+  </button>
+</Tooltip>
+```
+
+**Aturan:**
+- Locked = `disabled` + `opacity-40 cursor-not-allowed` + tooltip menjelaskan **kenapa** terkunci dan **kapan** akan terbuka.
+- `aria-label` harus menyatakan status terkunci untuk screen reader (jangan hanya andalkan opacity/tooltip).
+- Icon View **tetap enabled** saat row lain dikunci (read tidak pernah dikunci).
+- Jangan sembunyikan tombol — disable + jelaskan (prinsip `empty-nav-state`: jelaskan kenapa unavailable, jangan diam-diam hilang).
+
 ### 3.3 Organisms
 
 #### Sidebar A (Customer Portal)
@@ -1051,3 +1281,4 @@ Sebelum klaim selesai untuk pekerjaan UI:
 | 2026-05-13 | 1.1 | Tambah pattern auth split-screen layout (customer login/register), Input with leading icon + eye toggle, Divider with text, Image Showcase Carousel dengan 3 default slides Surface A, Auth Centered layout (admin login), brand mark wordmark variant (anchor + "LPS System"), canonical naming. Dipicu oleh screenshot login customer baru. |
 | 2026-05-14 | 1.3 | **Invoice-style Detail Card** baru di §3.2: tiga blok (Vessel Ops Grid + Line Items Table + Payment Instruction Box) untuk Detail EPB invoice-like. Sub-komponen baru: **Line Items Table** (standalone, table dengan tfoot Subtotal/PPn/Total dan baris Total emphasized) dan **Payment Instruction Box** (amber tone, font-mono untuk Kode Bayar & No Rek, countdown indicator pada Batas Pembayaran). Currency support multi-currency (IDR/USD) via `Intl.NumberFormat`. Compact variant untuk preview di M9 (Block 1+2 only, no payment instruction). Dipicu oleh permintaan improve UI Detail Tagihan menyerupai invoice fisik. |
 | 2026-05-13 | 1.2 | **Status label sync dengan production:** UNPAID→"Belum Dibayar", Pembayaran Dikonfirmasi→"Lunas", Menunggu Verifikasi Pembayaran→"Menunggu Verifikasi" (lebih ringkas). Tambah kategori filter "Perlu Tindakan" (UNPAID+PAYMENT_REJECT+Overdue) sebagai meta-status untuk KPI pill & tab. Tambah komponen baru: KPI Filter Pill (3 default kategori billing), Overdue Date Display (deteksi due_date < now), Inline Info Banner (varian per status untuk list items). Tambah Overdue indicator palette token. Dipicu oleh pemisahan M9b/M9c dan screenshot production EPB & Invoice. |
+| 2026-05-15 | 1.4 | **Master-data CRUD patterns** untuk M13 (Mother Vessel Master). Tambah status mapping `ACTIVE`/`INACTIVE` (master data) + `PENDING_APPROVAL`/`REJECTED` (approval request) di §2.1. Komponen molecule baru di §3.2: **Modal Dialog** (form/detail, header+body scroll+footer sticky), **Confirmation Dialog** (state change/destructive, icon bulat + copy konsekuensi konkret), **Form Field Grid** (2-kolom, required asterisk, disabled vs read-only, inline validation on blur, field grouping), **Audit Timeline** (Riwayat Perubahan — vertical timeline approval history dengan rejection reason emphasized), **Disclaimer Banner** (severity warning, set ekspektasi pre-aksi), **Locked Row Action** (disabled icon + tooltip untuk pending-approval lock). Divalidasi via skill ui-ux-pro-max (forms/UX domain). Dipicu oleh modul baru M13. |

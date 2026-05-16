@@ -1,16 +1,28 @@
 # M8 — Nomination Request Submission: Technical Specifications
 
+> **v1.1 (Mei 2026):** Field **Vessel** tidak lagi free-text. Vessel dipilih dari **Mother Vessel (MV) milik customer ber-status `ACTIVE`** via modul M13. Sumber: `GET /api/customer/mother-vessels/active` (bukan lagi `GET /api/sts/vessels` generik). Lihat §1.1 + FR-MV-09. Konsekuensi dari modul baru M13 — dual-update dengan `module/mother-vessel-master/`.
+
 ## 1. Nomination Form (FR-NS-01)
 
 ### Form Fields & Validation
 | Field | Type | Validation |
 |-------|------|-----------|
-| Vessel Name | String | Required, max 255 chars |
+| Vessel (MV) | Selection (mv_asset_id) | Required. Dipilih dari MV milik customer ber-status `ACTIVE` (M13). Bukan free-text. Lihat §1.1 |
 | ETA | DateTime | Required, must be future date |
 | Cargo Type | String | Required, max 255 chars |
 | Cargo Quantity | Decimal | Required, positive number, unit: MT |
 | Charterer | String | Required, max 255 chars |
 | Estimasi Jumlah Barge | Integer | Required, min 1 |
+
+### 1.1 Vessel Selection (v1.1 — terintegrasi M13)
+
+- Field Vessel di form M8 adalah **selector**, bukan free-text. Customer memilih dari daftar **Mother Vessel miliknya yang ber-status `ACTIVE`**.
+- Sumber data: **`GET /api/customer/mother-vessels/active`** (endpoint LPS internal, disiapkan di M13 spec §4 / handoff Step 3.5). Mengembalikan ringkas: `[{ asset_id, asset_code, vessel_name, imo_number, capacity_dwt }]`.
+- MV ber-status `PENDING_APPROVAL`, `INACTIVE`, atau `REJECTED` **tidak muncul** di selector (FR-MV-09 — validasi di server-side endpoint `/active`).
+- Saat customer pilih MV: simpan `mv_asset_id` (referensi ke master MV STS). `vessel_name` + `imo_number` di-snapshot dari pilihan untuk display & payload STS (denormalized — master tetap di STS).
+- **Empty state:** jika customer belum punya MV `ACTIVE`, selector menampilkan pesan + link ke `/customer/mother-vessel` (menu Mother Vessel M13) untuk mendaftarkan MV lebih dulu.
+- **Server-side validation (submit):** endpoint submit M8 wajib re-validate `mv_asset_id` adalah MV milik customer (owner match JWT org) ber-status `ACTIVE`. Reject `422` jika invalid (defensive — UI sudah memfilter, ini guard tambahan).
+- **Dependency:** M13 (Mother Vessel Master) harus tersedia. Lihat [`module/mother-vessel-master/`](../mother-vessel-master/).
 
 ### Document Uploads (FR-NS-02)
 | Document | Type | Validation |
@@ -104,7 +116,9 @@ CREATE TABLE nominations (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id         UUID NOT NULL REFERENCES customers(id),
     nomination_number   VARCHAR(30) UNIQUE,
-    vessel_name         VARCHAR(255),
+    mv_asset_id         VARCHAR(100),   -- v1.1: ref ke master MV STS (dipilih dari M13 active MV). NULL hanya untuk draft legacy.
+    vessel_name         VARCHAR(255),   -- snapshot dari MV terpilih (denormalized untuk display & payload STS)
+    vessel_imo          VARCHAR(20),    -- v1.1: snapshot IMO dari MV terpilih
     eta                 TIMESTAMPTZ,
     cargo_type          VARCHAR(255),
     cargo_quantity      DECIMAL(15,2),

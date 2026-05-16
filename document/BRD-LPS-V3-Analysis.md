@@ -51,6 +51,7 @@
 | 26 | Section 1.3 | Tabel hubungan LPS-STS: pisah baris "EPB & Invoice Customer Portal" menjadi dua baris (EPB partial payment + Invoice settlement) untuk klarifikasi pembagian tanggung jawab. | KLARIFIKASI | Splitting M9b/M9c |
 | 27 | Section 2.1 (9 & 9b) & 3.4.9/9b | **Perluasan data EPB ke invoice-style display.** EPB sekarang harus menampilkan: (a) data operasional voyage (Vessel, Crane, STS Slot, Mooring Team, ETA, Surveyor, Anchor, Est. Duration); (b) line items breakdown (item layanan + volume + rate + jumlah) dengan subtotal, PPn 11%, total; (c) instruksi pembayaran lengkap (Bank, No Rekening, Atas Nama, Kode Bayar, Batas Pembayaran). Tambah **FR-EI-11** (Detail Tagihan invoice-style), **FR-EI-12** (Download EPB PDF), **FR-NP-09** (preview EPB invoice-like di halaman M9 dengan tombol Download). Currency support multi-currency (IDR / USD) — UI render sesuai field `currency` dari STS. PDF source: `epb_pdf_url` dari webhook STS, di-stream via proxy endpoint LPS. | TAMBAH | Screenshot UI Production + Improvement Mei 2026 |
 | 28 | Section 3.4.9b | **Penambahan section "Detail Nominasi" di halaman EPB detail.** Halaman `/customer/billing/epb/:id` sekarang menampilkan section "Detail Nominasi" (selalu tampil, semua status) berisi data nominasi induk: Kapal, Tipe Kapal, Jenis Cargo, Towage Plan, ETA, Agen, Charterer, Dibuat, Diperbarui. Data bersumber dari JOIN `nominations` di endpoint detail (tidak duplikasi tabel). Spesifikasi Payment Instruction Box (Block 3) dipertegas: 2-column grid di dalam amber box, Total di-highlight bold + navy. Tambah **FR-EI-13**. | TAMBAH | Screenshot UI Production + Improvement Mei 2026 |
+| 29 | Section 1.3, 2.1 (13), 3.1, 3.3.2, 3.4.13 | **Modul BARU: M13 — Mother Vessel Master (Customer Portal).** Customer dapat mengelola data master Mother Vessel (MV) miliknya sendiri di Customer Portal: Add MV, Edit MV, Deactivate MV. Master MV **disimpan di DB STS Platform** — LPS hanya proxy ke STS API (tidak ada tabel master MV di DB LPS). Semua aksi customer (add/edit/deactivate) menghasilkan **approval request** yang harus di-approve STS Admin sebelum berlaku efektif. Lifecycle approval: `PENDING` → `APPROVED` / `REJECTED`. Pending records tampil di tabel dengan badge "Pending Approval" + tidak bisa dipakai di nominasi. Edit/Deactivate di-lock saat status `PENDING`. Audit log per MV menampilkan riwayat approval request (siapa submit, kapan, status, alasan reject). Scope Phase 1: **MV only** — halaman khusus Mother Vessel, **tidak ada tabs/filter asset type lain**. Tambah FR-MV-01..FR-MV-12. Total modul aktif menjadi 14 (M1–M12 + M9b + M9c + M13). | TAMBAH | Screenshot UI Production + Briefing Customer Mei 2026 |
 
 ---
 
@@ -98,6 +99,7 @@ Sistem LPS dan STS Platform beroperasi sebagai **dua sistem terpisah yang terhub
 | Weather Monitoring & Alert | ✅ Mengelola | Konsumsi data cuaca |
 | Radar & Navigation Surveillance | ✅ Mengelola | — |
 | Nomination Request (Customer) | ✅ Portal submit | Proses approval, scheduling, resource assignment |
+| Mother Vessel Master (Customer) | ✅ Portal UI + proxy ke STS API (LPS tidak menyimpan master MV) | ✅ DB master MV + approval queue + verifikasi admin |
 | Monitoring & Visibility Dashboard | ✅ Real-time dashboard | — |
 | System Configuration | ✅ Mengelola (API, weather threshold, alert, user/role) | — |
 | Master Data (Vessel, Stakeholder, Rate Card) | Konsumsi via API | ✅ Mengelola (CRUD) |
@@ -445,6 +447,56 @@ Sub-modul yang mengelola konfigurasi sistem LPS, pengelolaan user dan role, sert
 
 > **Catatan:** Data master vessel, stakeholder, zona perairan, anchor point, dan rate card dikelola oleh STS Platform dan dikonsumsi oleh LPS melalui API sinkronisasi. LPS menyimpan local cache data master untuk operasional, dengan mekanisme sync berkala. Registrasi customer baru di LPS Portal akan disinkronisasi ke STS Platform secara otomatis.
 
+#### 13. Mother Vessel Master (Customer Portal) — **BARU** *(diidentifikasi dari Briefing Customer Mei 2026)*
+
+**Definisi**
+Modul dalam Customer Portal yang memungkinkan customer mengelola data master Mother Vessel (MV) miliknya sendiri (Add / Edit / Deactivate). **Data master MV bersifat read-through ke STS Platform** — LPS tidak menyimpan tabel master MV di DB lokalnya. Setiap aksi customer (Add/Edit/Deactivate) menghasilkan **approval request** yang harus di-verifikasi STS Admin sebelum berlaku efektif.
+
+**Tujuan**
+- Memberikan kontrol kepada customer untuk mengelola data master MV miliknya tanpa harus mengirim email/ticket ke admin STS.
+- Mempertahankan otoritas data master di STS Platform (single source of truth) — LPS sebagai UI proxy.
+- Menyediakan audit trail per MV (riwayat approval request) untuk transparency.
+- Mencegah race condition: pending request mengunci record sampai STS Admin selesai verifikasi.
+
+**Cakupan**
+
+*Customer Capabilities*
+- **Add New MV:** Customer mengisi form (Asset Code auto-generate, Vessel Name, IMO Number, Type, Call Sign, Classification, Capacity DWT, GRT, Length LOA, Beam, Max Draft, Owner auto-set ke organisasi customer, Status). Submit → kirim ke STS sebagai approval request.
+- **Edit MV:** Customer pilih MV existing → edit field → Submit → kirim ke STS sebagai approval request (untuk perubahan).
+- **Deactivate MV:** Customer klik tombol power → konfirmasi → kirim ke STS sebagai approval request (untuk status change ke `INACTIVE`).
+
+*Approval Lifecycle*
+```
+Customer submit aksi (Add/Edit/Deactivate)
+  └─ POST ke STS API (approval request) — status PENDING
+       ├─ STS Admin Approve → APPROVED (record live di master MV STS)
+       └─ STS Admin Reject → REJECTED (record tidak berlaku; customer lihat alasan reject)
+```
+
+*List View di Customer Portal*
+- Sidebar menu "Mother Vessel" (Customer Portal).
+- Header page "Mother Vessel" + tombol "Add New MV".
+- Search bar (asset code, vessel name, IMO, owner).
+- Tabel kolom: View (icon mata) | Edit (icon pencil) | Deactivate (icon power) | Asset Code | Vessel Name | Vessel Type | Classification | Capacity | Owner | Status.
+- Status badge: `ACTIVE` (hijau), `INACTIVE` (abu-abu), `PENDING APPROVAL` (kuning), `REJECTED` (merah, hover untuk alasan).
+
+*Scope Phase 1 — MV Only*
+- Modul ini **khusus mengelola Mother Vessel (MV)**: Add / Edit / Deactivate hanya untuk MV.
+- **Tidak ada tabs/filter/list untuk asset type lain** (Barge, Tug Boat, Floating Crane, Bulldozer, Wheel Loader, Excavator). Seluruh halaman hanya menampilkan MV milik organisasi customer.
+- Dukungan asset type lain berada di luar scope Phase 1 dan dapat menjadi modul/scope terpisah di kemudian hari jika dibutuhkan.
+
+*Pending Approval Behavior*
+- Record berstatus `PENDING APPROVAL` **tampil** di tabel customer dengan badge khusus.
+- Record `PENDING APPROVAL` **tidak bisa dipilih** sebagai MV di form Nomination Request (M8).
+- Tombol Edit dan Deactivate untuk record `PENDING APPROVAL` **disabled** (lock) sampai STS Admin selesai verifikasi.
+
+*Audit Log per MV*
+- Detail MV (icon mata) menampilkan section "Riwayat Perubahan" dengan list approval request:
+  - Timestamp submit, jenis aksi (Add / Edit / Deactivate), submitter (user customer), status (Pending / Approved / Rejected), alasan reject (jika ada), timestamp resolution.
+- Tidak ada operasi delete fisik record — hanya status `INACTIVE`.
+
+> **Catatan integrasi:** LPS tidak menyimpan tabel `mother_vessels`. Semua list/detail/CRUD di-proxy ke STS API. LPS hanya menyimpan cache status approval request (TTL singkat, e.g. 5–15 menit) untuk performa UI. Otoritatif tetap STS.
+
 ### 2.2 Out of Scope
 
 1. Pengadaan hardware fisik peralatan LPS (AIS Base Station, VHF Radio, RADAR, Tower).
@@ -477,7 +529,7 @@ Berikut adalah asumsi yang digunakan dalam penyusunan Business Requirement Docum
 
 ## 3. END-TO-END PROCESS
 
-### 3.1 Modul LPS (12 modul)
+### 3.1 Modul LPS (14 modul)
 
 **Sistem Eksternal yang terintegrasi dengan LPS:**
 - AIS Provider → Data posisi kapal real-time
@@ -486,7 +538,7 @@ Berikut adalah asumsi yang digunakan dalam penyusunan Business Requirement Docum
 - Bea Cukai → Laporan manifes
 - **STS Platform → Sinkronisasi data master, pengiriman nominasi, penerimaan status update**
 
-**Modul Inti LPS (12 modul):**
+**Modul Inti LPS (14 modul aktif: M1–M12 + M9b + M9c + M13):**
 
 | No | Modul | Kategori |
 |----|-------|----------|
@@ -504,6 +556,7 @@ Berikut adalah asumsi yang digunakan dalam penyusunan Business Requirement Docum
 | M10 | Customer Dashboard & Monitoring | Customer Portal |
 | M11 | Monitoring & Visibility Dashboard | Monitoring |
 | M12 | System Configuration | Konfigurasi |
+| M13 | Mother Vessel Master (Customer Portal) | Customer Portal |
 
 ### 3.2 End-to-End Flow — Skenario Operasional Utama
 
@@ -582,6 +635,7 @@ Sistem menerapkan Role-Based Access Control (RBAC) untuk memastikan setiap pengg
 | EPB (Customer Portal) | — | — | — | View | — | — | Full | View |
 | Invoice (Customer Portal) | — | — | — | View | — | — | Full | View |
 | Customer Dashboard & Monitoring | — | — | — | View | — | — | Full | View |
+| Mother Vessel Master (Customer Portal) | — | — | — | View | — | — | Full (Add / Edit / Deactivate via approval request) | View |
 | Monitoring Dashboard | Full | View | View | Full | View | View | View (limited) | Full |
 | System Configuration | — | — | — | Limited | — | — | — | Full |
 
@@ -759,6 +813,25 @@ Sistem menerapkan Role-Based Access Control (RBAC) untuk memastikan setiap pengg
 | FR-SC-04 | Sistem harus menyimpan seluruh aktivitas dalam immutable audit log yang dapat difilter berdasarkan entity type, actor, dan rentang waktu | System |
 | FR-SC-05 | Sistem harus melakukan sinkronisasi data master (vessel, stakeholder, zona, anchor point) dari STS Platform secara berkala melalui API | System |
 | FR-SC-06 | Sistem harus menyimpan local cache data master dari STS Platform untuk memastikan operasional berjalan meskipun koneksi ke STS terputus sementara | System |
+
+#### 3.4.13. Mother Vessel Master (Customer Portal) — **BARU** *(diidentifikasi dari Briefing Customer Mei 2026)*
+
+| FR ID | Requirements | Actor |
+|-------|-------------|-------|
+| FR-MV-01 | Sistem harus menyediakan menu **"Mother Vessel"** di sidebar Customer Portal yang menampilkan daftar Mother Vessel (MV) milik organisasi customer (data master di-fetch dari STS Platform via API) | Customer |
+| FR-MV-02 | Halaman Mother Vessel harus menampilkan **list MV milik organisasi customer** dengan search (asset code, vessel name, IMO, owner) dan pagination. Phase 1 **khusus MV** — tidak ada tabs filter asset type lain | Customer |
+| FR-MV-03 | Customer harus dapat menambahkan MV baru melalui tombol **"Add New MV"** yang membuka form dengan field: Asset Code (auto-generate saat save), Vessel Name, IMO Number, Type, Call Sign, Classification, Capacity (DWT), GRT, Length LOA (m), Beam (m), Max Draft (m), Owner (auto-set ke organisasi customer, read-only), Status. Submit form akan membuat **approval request** ke STS Platform via API | Customer |
+| FR-MV-04 | Customer harus dapat mengedit MV existing miliknya melalui aksi Edit (icon pencil) yang membuka form yang sama dengan data ter-prefill. Submit edit akan membuat **approval request** ke STS Platform via API | Customer |
+| FR-MV-05 | Customer harus dapat me-non-aktifkan (Deactivate) MV miliknya melalui aksi Deactivate (icon power). Aksi ini akan membuat **approval request** ke STS Platform untuk mengubah `status` MV menjadi `INACTIVE` | Customer |
+| FR-MV-06 | Sistem harus menampilkan **disclaimer** di setiap form Add/Edit/Deactivate: "All changes will be submitted as an approval request and require admin review before being applied." | Customer |
+| FR-MV-07 | Sistem harus mengirim seluruh aksi customer (Add / Edit / Deactivate MV) sebagai **approval request** ke STS Platform via API. LPS tidak menyimpan tabel master MV — data otoritatif tetap di STS. LPS hanya menyimpan cache status approval request dengan TTL singkat (default 5–15 menit) | System |
+| FR-MV-08 | Sistem harus menampilkan **status approval** per MV di tabel list dengan badge yang sesuai: `ACTIVE` (hijau), `INACTIVE` (abu-abu), `PENDING APPROVAL` (kuning), `REJECTED` (merah). Status diambil dari STS API | Customer |
+| FR-MV-09 | Record MV dengan status `PENDING APPROVAL` **tetap tampil** di tabel Mother Vessel, namun **tidak boleh dipilih** sebagai MV di form Nomination Request (M8). Validasi terjadi di sisi LPS (form M8 hanya menampilkan MV ber-status `ACTIVE`) | System |
+| FR-MV-10 | Untuk MV ber-status `PENDING APPROVAL`, tombol Edit dan Deactivate harus **disabled** (lock) sampai STS Admin selesai verifikasi (approve atau reject). Hal ini mencegah race condition multiple approval request untuk record yang sama | System |
+| FR-MV-11 | Sistem harus menyediakan view detail MV (icon mata) yang menampilkan section **"Riwayat Perubahan"** berisi daftar approval request untuk MV tersebut: timestamp submit, jenis aksi (Add/Edit/Deactivate), user yang submit, status (Pending/Approved/Rejected), alasan reject (jika ada), timestamp resolution. Data di-fetch dari STS API | Customer |
+| FR-MV-12 | Sistem harus menampilkan **alasan reject** dari STS Admin pada MV ber-status `REJECTED` (hover state pada badge atau di section Riwayat Perubahan), agar customer mengetahui apa yang perlu diperbaiki sebelum re-submit | Customer |
+
+> **Catatan:** Tidak ada operasi delete fisik MV. "Deactivate" hanya mengubah `status` menjadi `INACTIVE` (tetap tersimpan untuk audit). Phase berikutnya dapat memperluas modul ini ke asset type lain (Barge, Tug Boat, Floating Crane, Bulldozer, Wheel Loader, Excavator) dengan form per-type.
 
 ### 3.5 Non-Functional Requirements
 
